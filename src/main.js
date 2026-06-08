@@ -3,6 +3,7 @@ import { tmt } from './data/tmt.js';
 import { predictMatch, formatRachaHTML } from './data/predictor.js';
 import fallbackRealScores from './data/real-scores.json';
 import { teamDetails } from './data/team-details.js';
+import { teamRatings } from './data/ratings.js';
 
 // --- State Store ---
 export const state = {
@@ -22,7 +23,7 @@ export const state = {
   prodeExacts: 0,
   prodeOutcome: 0,
   prodeTotalPlayed: 0,
-  expandedMatches: new Set() // set of matchIds currently expanded to show details
+  selectedTeamDetails: 'ARGENTINA' // default team to show in selecciones view
 };
 
 // --- Team Flags Map ---
@@ -97,10 +98,21 @@ export function getTeamDisplayName(teamName) {
     <span class="team-display">
       <button class="fav-btn ${favClass}" onclick="event.stopPropagation(); toggleFavorite('${cleanName}')" title="Marcar como favorito">${isFav ? '★' : '☆'}</button>
       <span class="flag-emoji">${flag}</span>
-      <span class="team-label">${teamName}</span>
+      <span class="team-label team-link" onclick="event.stopPropagation(); window.showTeamDetails('${cleanName}')" title="Ver detalles de la selección">${teamName}</span>
     </span>
   `;
 }
+
+// Window level helper to show team details in its dedicated tab
+window.showTeamDetails = function(teamName) {
+  const cleanName = teamName.trim().toUpperCase();
+  if (teamDetails[cleanName]) {
+    state.activeTab = 'selecciones';
+    state.selectedTeamDetails = cleanName;
+    saveState();
+    renderActiveTab();
+  }
+};
 
 // Window level helper to toggle favorite status
 window.toggleFavorite = function(teamName) {
@@ -147,6 +159,7 @@ export function loadState() {
         state.activeTab = parsed.activeTab || 'portada';
         state.favorites = parsed.favorites || [];
         state.filters = parsed.filters || { view: 'all', selectedTeam: 'all' };
+        state.selectedTeamDetails = parsed.selectedTeamDetails || 'ARGENTINA';
         
         // Ensure all matches exist in state.matches
         rawMatches.forEach(m => {
@@ -175,7 +188,8 @@ export function saveState() {
       timezone: state.timezone,
       activeTab: state.activeTab,
       favorites: state.favorites,
-      filters: state.filters
+      filters: state.filters,
+      selectedTeamDetails: state.selectedTeamDetails
     }));
   } catch (e) {
     console.error('Error saving state to localStorage:', e);
@@ -496,6 +510,7 @@ export function renderActiveTab() {
   if (state.activeTab === 'ingreso') renderIngreso();
   if (state.activeTab === 'grupos') renderGrupos();
   if (state.activeTab === 'fase-final') renderFaseFinal();
+  if (state.activeTab === 'selecciones') renderSelecciones();
 }
 
 function renderPortada() {
@@ -810,46 +825,6 @@ function renderIngreso() {
           html += realBadgeHtml;
         }
         
-        // Ficha de Detalle de Selecciones (Plantilla, DT, Historial)
-        const det1 = teamDetails[t1Name.trim().toUpperCase()];
-        const det2 = teamDetails[t2Name.trim().toUpperCase()];
-        if (det1 || det2) {
-          const isExpanded = state.expandedMatches.has(m.id);
-          const activeClass = isExpanded ? 'active' : '';
-          
-          html += `
-            <div class="match-details-drawer ${activeClass}">
-              <div class="drawer-grid">
-                <div class="drawer-team-col">
-                  <h5>${t1Name}</h5>
-                  <p><strong>DT:</strong> ${det1 ? det1.dt : 'Por definir'}</p>
-                  <p><strong>Figura:</strong> ${det1 ? det1.figura : 'Por definir'}</p>
-                  <p><strong>Historial:</strong> ${det1 ? det1.historial : 'N/A'}</p>
-                  <div class="drawer-squad">
-                    <strong>Plantilla convocada:</strong>
-                    <ul>
-                      ${det1 ? det1.plantilla.map(p => `<li>${p}</li>`).join('') : '<li>No disponible</li>'}
-                    </ul>
-                  </div>
-                </div>
-                <div class="drawer-divider"></div>
-                <div class="drawer-team-col">
-                  <h5>${t2Name}</h5>
-                  <p><strong>DT:</strong> ${det2 ? det2.dt : 'Por definir'}</p>
-                  <p><strong>Figura:</strong> ${det2 ? det2.figura : 'Por definir'}</p>
-                  <p><strong>Historial:</strong> ${det2 ? det2.historial : 'N/A'}</p>
-                  <div class="drawer-squad">
-                    <strong>Plantilla convocada:</strong>
-                    <ul>
-                      ${det2 ? det2.plantilla.map(p => `<li>${p}</li>`).join('') : '<li>No disponible</li>'}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-          `;
-        }
-        
         html += `</div>`;
       });
       
@@ -861,27 +836,6 @@ function renderIngreso() {
   container.innerHTML = html;
   
   // Bind events
-  container.querySelectorAll('.match-card').forEach(card => {
-    card.addEventListener('click', e => {
-      // Don't toggle drawer if clicking input, fav button, draw button or anything inside them
-      if (e.target.closest('.score-input') || e.target.closest('.fav-btn') || e.target.closest('.draw-btn')) {
-        return;
-      }
-      
-      const matchId = parseInt(card.dataset.matchId);
-      const drawer = card.querySelector('.match-details-drawer');
-      if (drawer) {
-        const isExpanded = drawer.classList.contains('active');
-        if (isExpanded) {
-          state.expandedMatches.delete(matchId);
-          drawer.classList.remove('active');
-        } else {
-          state.expandedMatches.add(matchId);
-          drawer.classList.add('active');
-        }
-      }
-    });
-  });
 
   const viewAllBtn = container.querySelector('#filter-view-all');
   if (viewAllBtn) {
@@ -1391,6 +1345,115 @@ export function initApp() {
   fetchRealScores();
   
   renderActiveTab();
+}
+
+export function renderSelecciones() {
+  const container = document.getElementById('selecciones-view');
+  if (!container) return;
+  
+  const teams = Object.keys(teamDetails).sort();
+  const selectedTeam = state.selectedTeamDetails || 'ARGENTINA';
+  const det = teamDetails[selectedTeam];
+  const ratingData = teamRatings[selectedTeam] || { initialRating: 'N/A', formCoefficient: 0, recentForm: [] };
+  
+  const flag = teamFlags[selectedTeam] || '🏳️';
+  
+  let squadHtml = '';
+  if (det) {
+    squadHtml = `
+      <div class="squad-sections-grid">
+        <div class="squad-pos-box glass-panel">
+          <h5>🧤 Arqueros</h5>
+          <ul>
+            ${det.arqueros.map(p => `<li>${p}</li>`).join('')}
+          </ul>
+        </div>
+        <div class="squad-pos-box glass-panel">
+          <h5>🛡️ Defensores</h5>
+          <ul>
+            ${det.defensores.map(p => `<li>${p}</li>`).join('')}
+          </ul>
+        </div>
+        <div class="squad-pos-box glass-panel">
+          <h5>⚙️ Mediocampistas</h5>
+          <ul>
+            ${det.mediocampistas.map(p => `<li>${p}</li>`).join('')}
+          </ul>
+        </div>
+        <div class="squad-pos-box glass-panel">
+          <h5>⚽ Delanteros</h5>
+          <ul>
+            ${det.delanteros.map(p => `<li>${p}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    `;
+  }
+  
+  container.innerHTML = `
+    <div class="header-row">
+      <h2>Fichas de Selecciones</h2>
+      <p>Conocé en detalle la plantilla convocada, el cuerpo técnico y la historia de los países participantes.</p>
+    </div>
+    
+    <div class="selecciones-control-bar glass">
+      <div class="team-selector-wrapper">
+        <label for="team-detail-select" class="filter-select-label">Seleccionar Selección:</label>
+        <select id="team-detail-select" class="glass-select">
+          ${teams.map(t => `
+            <option value="${t}" ${t === selectedTeam ? 'selected' : ''}>
+              ${getTeamFlagAndName(t)}
+            </option>
+          `).join('')}
+        </select>
+      </div>
+    </div>
+    
+    <div class="team-detail-card glass">
+      <div class="team-detail-header">
+        <span class="giant-flag">${flag}</span>
+        <div class="team-detail-title-block">
+          <h3>${selectedTeam}</h3>
+          <span class="team-detail-badge">FIFA Elo: <strong>${ratingData.initialRating}</strong></span>
+        </div>
+      </div>
+      
+      <div class="team-info-grid">
+        <div class="info-item">
+          <span class="info-item-lbl">Director Técnico (DT)</span>
+          <span class="info-item-val text-cyan">${det ? det.dt : 'Por definir'}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item-lbl">Jugador Figura</span>
+          <span class="info-item-val text-gold">${det ? det.figura : 'Por definir'}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item-lbl">Mejor Historial Mundial</span>
+          <span class="info-item-val">${det ? det.historial : 'N/A'}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item-lbl">Racha Reciente</span>
+          <span class="info-item-val">${formatRachaHTML(ratingData.recentForm)}</span>
+        </div>
+      </div>
+      
+      <div class="squad-header">
+        <h4>Plantilla Oficial Convocada</h4>
+      </div>
+      
+      ${squadHtml}
+    </div>
+  `;
+  
+  // Bind selector event
+  const select = document.getElementById('team-detail-select');
+  if (select) {
+    select.addEventListener('change', e => {
+      state.selectedTeamDetails = e.target.value;
+      saveState();
+      renderSelecciones();
+    });
+  }
 }
 
 // Initialize immediately (module scripts run after DOM is parsed)
