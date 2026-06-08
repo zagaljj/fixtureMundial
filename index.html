@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador de Fixture Copa Mundial FIFA 2026™</title>
+  <!-- Google Fonts Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <div class="app-wrapper">
+    <header class="app-header glass">
+      <div class="header-main">
+        <div class="logo-area">
+          <span class="logo-emoji">🏆</span>
+          <div class="logo-text">
+            <span class="logo-title">Mundial 2026</span>
+            <span class="logo-subtitle">Simulador</span>
+          </div>
+        </div>
+        
+        <nav class="app-nav">
+          <button class="nav-btn active" data-tab="portada" id="nav-portada">Portada</button>
+          <button class="nav-btn" data-tab="ingreso" id="nav-ingreso">Ingreso</button>
+          <button class="nav-btn" data-tab="grupos" id="nav-grupos">Grupos</button>
+          <button class="nav-btn" data-tab="fase-final" id="nav-fase-final">Fase Final</button>
+        </nav>
+        
+        <div class="settings-area">
+          <label for="timezone-select" class="tz-label">Zona Horaria:</label>
+          <select id="timezone-select" class="tz-select glass-select">
+            <option value="auto">Detectando...</option>
+          </select>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-content">
+      <!-- Tab Views -->
+      <section id="portada-view" class="view-container active"></section>
+      <section id="ingreso-view" class="view-container"></section>
+      <section id="grupos-view" class="view-container"></section>
+      <section id="fase-final-view" class="view-container"></section>
+    </main>
+
+    <footer class="app-footer">
+      <p>© 2026 Mundial Fixture Simulator. Todos los derechos reservados. Basado en el modelo de Clases Excel.</p>
+    </footer>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
