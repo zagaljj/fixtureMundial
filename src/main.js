@@ -1221,102 +1221,24 @@ export async function fetchRealScores() {
   state.realScores = { ...fallbackRealScores };
   
   try {
-    // We try to fetch the community worldcup json endpoint or an open-source mirror
-    // During 2026 World Cup, this URL will be live. As a backup, we fallback to local file.
-    const res = await fetch('https://worldcupjson.net/matches');
+    const res = await fetch('https://worldcup26.ir/get/games');
     if (!res.ok) throw new Error('API down');
-    const apiMatches = await res.json();
-    
-    const nameMap = {
-      'MEXICO': 'MÉXICO',
-      'SOUTH AFRICA': 'SUDÁFRICA',
-      'SOUTH KOREA': 'COREA DEL SUR',
-      'CZECH REPUBLIC': 'REP. CHECA',
-      'CANADA': 'CANADÁ',
-      'BOSNIA AND HERZEGOVINA': 'BOSNIA Y HERZEG.',
-      'USA': 'ESTADOS UNIDOS',
-      'UNITED STATES': 'ESTADOS UNIDOS',
-      'PARAGUAY': 'PARAGUAY',
-      'QATAR': 'CATAR',
-      'SWITZERLAND': 'SUIZA',
-      'BRAZIL': 'BRASIL',
-      'MOROCCO': 'MARRUECOS',
-      'HAITI': 'HAITÍ',
-      'SCOTLAND': 'ESCOCIA',
-      'AUSTRALIA': 'AUSTRALIA',
-      'TURKEY': 'TURQUÍA',
-      'GERMANY': 'ALEMANIA',
-      'CURACAO': 'CURAZAO',
-      'SPAIN': 'ESPAÑA',
-      'FRANCE': 'FRANCIA',
-      'GHANA': 'GHANA',
-      'ENGLAND': 'INGLATERRA',
-      'IRAQ': 'IRAK',
-      'IRAN': 'IRÁN',
-      'JAPAN': 'JAPÓN',
-      'JORDAN': 'JORDANIA',
-      'COLOMBIA': 'COLOMBIA',
-      'SENEGAL': 'SENEGAL',
-      'NORWAY': 'NORUEGA',
-      'NEW ZEALAND': 'NUEVA ZELANDA',
-      'PANAMA': 'PANAMÁ',
-      'NETHERLANDS': 'PAÍSES BAJOS',
-      'PORTUGAL': 'PORTUGAL',
-      'REPUBLIC OF CONGO': 'REP. DEL CONGO',
-      'CONGO': 'REP. DEL CONGO',
-      'SWEDEN': 'SUECIA',
-      'TUNISIA': 'TÚNEZ',
-      'URUGUAY': 'URUGUAY',
-      'UZBEKISTAN': 'UZBEKISTÁN',
-      'ARGENTINA': 'ARGENTINA',
-      'BELGIUM': 'BÉLGICA',
-      'CROATIA': 'CROACIA',
-      'ECUADOR': 'ECUADOR',
-      'EGYPT': 'EGIPTO',
-      'COTE D\'IVOIRE': 'COSTA DE MARFIL',
-      'IVORY COAST': 'COSTA DE MARFIL',
-      'CABO VERDE': 'CABO VERDE',
-      'CAPE VERDE': 'CABO VERDE',
-      'AUSTRIA': 'AUSTRIA',
-      'ALGERIA': 'ARGELIA'
-    };
+    const data = await res.json();
+    const apiMatches = data.games || [];
     
     apiMatches.forEach(apiMatch => {
-      if (apiMatch.status === 'completed' || apiMatch.status === 'finished') {
-        const homeName = apiMatch.home_team.name.trim().toUpperCase();
-        const awayName = apiMatch.away_team.name.trim().toUpperCase();
-        
-        const translatedHome = nameMap[homeName] || homeName;
-        const translatedAway = nameMap[awayName] || awayName;
-        
-        // Find local match
-        const localMatch = rawMatches.find(m => {
-          if (m.id <= 72) {
-            return (m.team1.trim().toUpperCase() === translatedHome && m.team2.trim().toUpperCase() === translatedAway) ||
-                   (m.team1.trim().toUpperCase() === translatedAway && m.team2.trim().toUpperCase() === translatedHome);
-          } else {
-            const resolved = state.resolvedKnockoutMatches[m.id];
-            if (resolved && resolved.team1 && resolved.team2) {
-              const resHome = resolved.team1.trim().toUpperCase();
-              const resAway = resolved.team2.trim().toUpperCase();
-              return (resHome === translatedHome && resAway === translatedAway) ||
-                     (resHome === translatedAway && resAway === translatedHome);
-            }
-            return false;
-          }
-        });
-        
-        if (localMatch) {
-          const isHomeOriginal = localMatch.team1.trim().toUpperCase() === translatedHome;
-          state.realScores[localMatch.id] = {
-            homeScore: isHomeOriginal ? apiMatch.home_team.goals : apiMatch.away_team.goals,
-            awayScore: isHomeOriginal ? apiMatch.away_team.goals : apiMatch.home_team.goals,
+      if (apiMatch.finished === 'TRUE') {
+        const matchId = parseInt(apiMatch.id);
+        if (matchId >= 1 && matchId <= 104) {
+          state.realScores[matchId] = {
+            homeScore: parseInt(apiMatch.home_score),
+            awayScore: parseInt(apiMatch.away_score),
             played: true
           };
         }
       }
     });
-    console.log('Successfully loaded scores from API.');
+    console.log('Successfully loaded scores from worldcup26.ir API.');
   } catch (e) {
     console.warn('API fetch failed, utilizing local fallbackScores database:', e);
   }
