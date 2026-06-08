@@ -2,6 +2,7 @@ import { rawMatches } from './data/matches.js';
 import { tmt } from './data/tmt.js';
 import { predictMatch, formatRachaHTML } from './data/predictor.js';
 import fallbackRealScores from './data/real-scores.json';
+import { teamDetails } from './data/team-details.js';
 
 // --- State Store ---
 export const state = {
@@ -20,7 +21,8 @@ export const state = {
   prodePoints: 0,
   prodeExacts: 0,
   prodeOutcome: 0,
-  prodeTotalPlayed: 0
+  prodeTotalPlayed: 0,
+  expandedMatches: new Set() // set of matchIds currently expanded to show details
 };
 
 // --- Team Flags Map ---
@@ -808,6 +810,46 @@ function renderIngreso() {
           html += realBadgeHtml;
         }
         
+        // Ficha de Detalle de Selecciones (Plantilla, DT, Historial)
+        const det1 = teamDetails[t1Name.trim().toUpperCase()];
+        const det2 = teamDetails[t2Name.trim().toUpperCase()];
+        if (det1 || det2) {
+          const isExpanded = state.expandedMatches.has(m.id);
+          const activeClass = isExpanded ? 'active' : '';
+          
+          html += `
+            <div class="match-details-drawer ${activeClass}">
+              <div class="drawer-grid">
+                <div class="drawer-team-col">
+                  <h5>${t1Name}</h5>
+                  <p><strong>DT:</strong> ${det1 ? det1.dt : 'Por definir'}</p>
+                  <p><strong>Figura:</strong> ${det1 ? det1.figura : 'Por definir'}</p>
+                  <p><strong>Historial:</strong> ${det1 ? det1.historial : 'N/A'}</p>
+                  <div class="drawer-squad">
+                    <strong>Plantilla convocada:</strong>
+                    <ul>
+                      ${det1 ? det1.plantilla.map(p => `<li>${p}</li>`).join('') : '<li>No disponible</li>'}
+                    </ul>
+                  </div>
+                </div>
+                <div class="drawer-divider"></div>
+                <div class="drawer-team-col">
+                  <h5>${t2Name}</h5>
+                  <p><strong>DT:</strong> ${det2 ? det2.dt : 'Por definir'}</p>
+                  <p><strong>Figura:</strong> ${det2 ? det2.figura : 'Por definir'}</p>
+                  <p><strong>Historial:</strong> ${det2 ? det2.historial : 'N/A'}</p>
+                  <div class="drawer-squad">
+                    <strong>Plantilla convocada:</strong>
+                    <ul>
+                      ${det2 ? det2.plantilla.map(p => `<li>${p}</li>`).join('') : '<li>No disponible</li>'}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+        
         html += `</div>`;
       });
       
@@ -819,6 +861,28 @@ function renderIngreso() {
   container.innerHTML = html;
   
   // Bind events
+  container.querySelectorAll('.match-card').forEach(card => {
+    card.addEventListener('click', e => {
+      // Don't toggle drawer if clicking input, fav button, draw button or anything inside them
+      if (e.target.closest('.score-input') || e.target.closest('.fav-btn') || e.target.closest('.draw-btn')) {
+        return;
+      }
+      
+      const matchId = parseInt(card.dataset.matchId);
+      const drawer = card.querySelector('.match-details-drawer');
+      if (drawer) {
+        const isExpanded = drawer.classList.contains('active');
+        if (isExpanded) {
+          state.expandedMatches.delete(matchId);
+          drawer.classList.remove('active');
+        } else {
+          state.expandedMatches.add(matchId);
+          drawer.classList.add('active');
+        }
+      }
+    });
+  });
+
   const viewAllBtn = container.querySelector('#filter-view-all');
   if (viewAllBtn) {
     viewAllBtn.addEventListener('click', () => {

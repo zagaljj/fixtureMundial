@@ -1145,3 +1145,99 @@ body {
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
+/* --- Collapsible Match Details Drawer --- */
+.match-card {
+  cursor: pointer;
+}
+
+.match-details-drawer {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out, margin-top 0.3s ease-out, padding-top 0.3s ease-out;
+  border-top: 1px dashed transparent;
+}
+
+.match-details-drawer.active {
+  max-height: 400px;
+  opacity: 1;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+.drawer-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 15px;
+  align-items: stretch;
+}
+
+.drawer-team-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drawer-team-col:first-child {
+  text-align: right;
+  align-items: flex-end;
+}
+
+.drawer-team-col:last-child {
+  text-align: left;
+  align-items: flex-start;
+}
+
+.drawer-team-col h5 {
+  font-family: var(--font-title);
+  font-size: 13px;
+  color: var(--accent-cyan);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.drawer-team-col p {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.drawer-team-col p strong {
+  color: var(--color-text-main);
+}
+
+.drawer-divider {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  align-self: stretch;
+}
+
+.drawer-squad {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.drawer-squad strong {
+  font-size: 11px;
+  color: var(--color-text-main);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.drawer-squad ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.drawer-squad li {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+
