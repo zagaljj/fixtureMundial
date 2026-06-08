@@ -1013,3 +1013,135 @@ body {
   background: #ef4444;
   box-shadow: 0 0 5px rgba(239, 68, 68, 0.3);
 }
+
+/* --- Prode Stats & Badges Styles --- */
+.prode-stats-box {
+  margin-top: 30px;
+  padding: 20px 25px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  border: var(--border-glass);
+}
+
+.prode-stats-box h4 {
+  font-family: var(--font-title);
+  color: var(--color-text-main);
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  margin-bottom: 15px;
+  text-transform: uppercase;
+}
+
+.prode-row {
+  display: flex;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.prode-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 90px;
+}
+
+.prode-val {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: var(--font-title);
+  color: var(--color-text-main);
+}
+
+.prode-lbl {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+  text-align: center;
+}
+
+.text-gold {
+  color: var(--accent-gold);
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+}
+
+/* Match Card outlines for Prode results */
+.match-card.match-card-exact {
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.1) !important;
+}
+
+.match-card.match-card-exact:hover {
+  border-color: rgba(16, 185, 129, 0.6) !important;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.2) !important;
+}
+
+.match-card.match-card-outcome {
+  border-color: rgba(245, 158, 11, 0.35) !important;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.08) !important;
+}
+
+.match-card.match-card-outcome:hover {
+  border-color: rgba(245, 158, 11, 0.5) !important;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.15) !important;
+}
+
+.match-card.match-card-fail {
+  border-color: rgba(239, 68, 68, 0.25) !important;
+  box-shadow: none !important;
+}
+
+.match-card.match-card-fail:hover {
+  border-color: rgba(239, 68, 68, 0.4) !important;
+}
+
+/* Real Scores Badge styling */
+.real-score-badge-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: 10px;
+}
+
+.real-score-label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.real-score-label strong {
+  color: var(--color-text-main);
+  font-size: 12px;
+}
+
+.prode-points-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+}
+
+.prode-points-badge.prode-exact {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.prode-points-badge.prode-outcome {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.prode-points-badge.prode-fail {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+

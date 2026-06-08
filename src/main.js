@@ -1,6 +1,7 @@
 import { rawMatches } from './data/matches.js';
 import { tmt } from './data/tmt.js';
 import { predictMatch, formatRachaHTML } from './data/predictor.js';
+import fallbackRealScores from './data/real-scores.json';
 
 // --- State Store ---
 export const state = {
@@ -14,7 +15,12 @@ export const state = {
   filters: {
     view: 'all', // 'all' | 'favorites'
     selectedTeam: 'all' // 'all' | specific team name (raw)
-  }
+  },
+  realScores: {}, // matchId -> { homeScore, awayScore, played }
+  prodePoints: 0,
+  prodeExacts: 0,
+  prodeOutcome: 0,
+  prodeTotalPlayed: 0
 };
 
 // --- Team Flags Map ---
@@ -506,6 +512,36 @@ function renderPortada() {
     }
   });
   
+  // Prode Score Card HTML
+  let prodeCard = '';
+  if (state.prodeTotalPlayed > 0) {
+    const totalAcc = state.prodeExacts + state.prodeOutcome;
+    const eff = (totalAcc / state.prodeTotalPlayed * 100).toFixed(0);
+    prodeCard = `
+      <div class="prode-stats-box glass-panel">
+        <h4>🏆 TU RENDIMIENTO PRODE</h4>
+        <div class="prode-row">
+          <div class="prode-col">
+            <span class="prode-val text-gold">${state.prodePoints} <small>pts</small></span>
+            <span class="prode-lbl">Puntos Totales</span>
+          </div>
+          <div class="prode-col">
+            <span class="prode-val">${state.prodeExacts}</span>
+            <span class="prode-lbl">Exactos (+3)</span>
+          </div>
+          <div class="prode-col">
+            <span class="prode-val">${state.prodeOutcome}</span>
+            <span class="prode-lbl">Ganador (+1)</span>
+          </div>
+          <div class="prode-col">
+            <span class="prode-val">${eff}%</span>
+            <span class="prode-lbl">Efectividad</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
   container.innerHTML = `
     <div class="welcome-card glass">
       <h1>Copa Mundial de la FIFA 2026™</h1>
@@ -526,6 +562,8 @@ function renderPortada() {
           <span class="stat-label">Promedio de Gol</span>
         </div>
       </div>
+      
+      ${prodeCard}
       
       <div class="info-section">
         <h3>Información del Torneo</h3>
@@ -648,12 +686,52 @@ function renderIngreso() {
         const t1Class = (resolved && resolved.winner === t1Name && resolved.winner) ? 'winner' : '';
         const t2Class = (resolved && resolved.winner === t2Name && resolved.winner) ? 'winner' : '';
         
+        // Mapear el resultado real
+        const real = state.realScores[m.id] || { homeScore: null, awayScore: null, played: false };
+        let realBadgeHtml = '';
+        let cardClass = '';
+        
+        if (real.played) {
+          const rhs = parseInt(real.homeScore);
+          const ras = parseInt(real.awayScore);
+          
+          let pointsLabel = '0 pts';
+          let badgeClass = 'prode-fail';
+          cardClass = 'match-card-fail';
+          
+          if (pred.homeScore !== null && pred.awayScore !== null && pred.homeScore !== '' && pred.awayScore !== '') {
+            const phs = parseInt(pred.homeScore);
+            const pas = parseInt(pred.awayScore);
+            
+            if (phs === rhs && pas === ras) {
+              pointsLabel = '+3 pts (Exacto)';
+              badgeClass = 'prode-exact';
+              cardClass = 'match-card-exact';
+            } else {
+              const predDiff = phs - pas;
+              const realDiff = rhs - ras;
+              if ((predDiff > 0 && realDiff > 0) || (predDiff < 0 && realDiff < 0) || (predDiff === 0 && realDiff === 0)) {
+                pointsLabel = '+1 pt (Acierto)';
+                badgeClass = 'prode-outcome';
+                cardClass = 'match-card-outcome';
+              }
+            }
+          }
+          
+          realBadgeHtml = `
+            <div class="real-score-badge-row">
+              <span class="real-score-label">Resultado Real: <strong>${rhs} - ${ras}</strong></span>
+              <span class="prode-points-badge ${badgeClass}">${pointsLabel}</span>
+            </div>
+          `;
+        }
+        
         // Predict match probabilities and score
         const predInfo = predictMatch(t1Name, t2Name);
         const hasPred = predInfo.score1 !== '-';
         
         html += `
-          <div class="match-card" data-match-id="${m.id}">
+          <div class="match-card ${cardClass}" data-match-id="${m.id}">
             <div class="match-meta">
               <span class="match-num">Partido #${m.id}</span>
               <span class="match-date">${dt.date} - ${dt.time} hs</span>
@@ -690,8 +768,8 @@ function renderIngreso() {
           `;
         }
         
-        // Prediction Widget
-        if (hasPred) {
+        // Prediction Widget (solo si el partido no se jugó)
+        if (hasPred && !real.played) {
           html += `
             <div class="match-predictions glass-panel">
               <div class="predictions-header">
@@ -723,6 +801,11 @@ function renderIngreso() {
               </div>
             </div>
           `;
+        }
+        
+        // Badge de resultado real (si el partido ya finalizó)
+        if (real.played) {
+          html += realBadgeHtml;
         }
         
         html += `</div>`;
@@ -782,10 +865,14 @@ function renderIngreso() {
       state.matches[matchId].winnerOverride = null;
       
       recalculateTournament();
+      calculateProdeStats();
       saveState();
       
       debounce(() => {
         renderIngreso();
+        // Re-renderizar portada para actualizar puntos
+        const navPortada = document.getElementById('nav-portada');
+        if (navPortada && state.activeTab === 'portada') renderPortada();
       }, 800)();
     });
   });
@@ -798,6 +885,7 @@ function renderIngreso() {
       state.matches[matchId].winnerOverride = winner;
       
       recalculateTournament();
+      calculateProdeStats();
       saveState();
       renderIngreso();
     });
@@ -1064,6 +1152,161 @@ function populateTimezones() {
   });
 }
 
+// --- Prode Score Calculations ---
+export function calculateProdeStats() {
+  let points = 0;
+  let exacts = 0;
+  let outcomes = 0;
+  let totalPlayed = 0;
+  
+  Object.keys(state.realScores).forEach(mId => {
+    const matchId = parseInt(mId);
+    const real = state.realScores[matchId];
+    
+    if (real && real.played) {
+      totalPlayed += 1;
+      const pred = state.matches[matchId];
+      
+      if (pred && pred.homeScore !== null && pred.awayScore !== null && pred.homeScore !== '' && pred.awayScore !== '') {
+        const phs = parseInt(pred.homeScore);
+        const pas = parseInt(pred.awayScore);
+        const rhs = parseInt(real.homeScore);
+        const ras = parseInt(real.awayScore);
+        
+        // Exact match check (+3 pts)
+        if (phs === rhs && pas === ras) {
+          points += 3;
+          exacts += 1;
+        } else {
+          // Outcome check (winner/draw) (+1 pt)
+          const predDiff = phs - pas;
+          const realDiff = rhs - ras;
+          
+          if ((predDiff > 0 && realDiff > 0) || (predDiff < 0 && realDiff < 0) || (predDiff === 0 && realDiff === 0)) {
+            points += 1;
+            outcomes += 1;
+          }
+        }
+      }
+    }
+  });
+  
+  state.prodePoints = points;
+  state.prodeExacts = exacts;
+  state.prodeOutcome = outcomes;
+  state.prodeTotalPlayed = totalPlayed;
+}
+
+// --- Fetch Real Scores from API with local Fallback ---
+export async function fetchRealScores() {
+  // 1. Initialize fallback scores first
+  state.realScores = { ...fallbackRealScores };
+  
+  try {
+    // We try to fetch the community worldcup json endpoint or an open-source mirror
+    // During 2026 World Cup, this URL will be live. As a backup, we fallback to local file.
+    const res = await fetch('https://worldcupjson.net/matches');
+    if (!res.ok) throw new Error('API down');
+    const apiMatches = await res.json();
+    
+    const nameMap = {
+      'MEXICO': 'MÉXICO',
+      'SOUTH AFRICA': 'SUDÁFRICA',
+      'SOUTH KOREA': 'COREA DEL SUR',
+      'CZECH REPUBLIC': 'REP. CHECA',
+      'CANADA': 'CANADÁ',
+      'BOSNIA AND HERZEGOVINA': 'BOSNIA Y HERZEG.',
+      'USA': 'ESTADOS UNIDOS',
+      'UNITED STATES': 'ESTADOS UNIDOS',
+      'PARAGUAY': 'PARAGUAY',
+      'QATAR': 'CATAR',
+      'SWITZERLAND': 'SUIZA',
+      'BRAZIL': 'BRASIL',
+      'MOROCCO': 'MARRUECOS',
+      'HAITI': 'HAITÍ',
+      'SCOTLAND': 'ESCOCIA',
+      'AUSTRALIA': 'AUSTRALIA',
+      'TURKEY': 'TURQUÍA',
+      'GERMANY': 'ALEMANIA',
+      'CURACAO': 'CURAZAO',
+      'SPAIN': 'ESPAÑA',
+      'FRANCE': 'FRANCIA',
+      'GHANA': 'GHANA',
+      'ENGLAND': 'INGLATERRA',
+      'IRAQ': 'IRAK',
+      'IRAN': 'IRÁN',
+      'JAPAN': 'JAPÓN',
+      'JORDAN': 'JORDANIA',
+      'COLOMBIA': 'COLOMBIA',
+      'SENEGAL': 'SENEGAL',
+      'NORWAY': 'NORUEGA',
+      'NEW ZEALAND': 'NUEVA ZELANDA',
+      'PANAMA': 'PANAMÁ',
+      'NETHERLANDS': 'PAÍSES BAJOS',
+      'PORTUGAL': 'PORTUGAL',
+      'REPUBLIC OF CONGO': 'REP. DEL CONGO',
+      'CONGO': 'REP. DEL CONGO',
+      'SWEDEN': 'SUECIA',
+      'TUNISIA': 'TÚNEZ',
+      'URUGUAY': 'URUGUAY',
+      'UZBEKISTAN': 'UZBEKISTÁN',
+      'ARGENTINA': 'ARGENTINA',
+      'BELGIUM': 'BÉLGICA',
+      'CROATIA': 'CROACIA',
+      'ECUADOR': 'ECUADOR',
+      'EGYPT': 'EGIPTO',
+      'COTE D\'IVOIRE': 'COSTA DE MARFIL',
+      'IVORY COAST': 'COSTA DE MARFIL',
+      'CABO VERDE': 'CABO VERDE',
+      'CAPE VERDE': 'CABO VERDE',
+      'AUSTRIA': 'AUSTRIA',
+      'ALGERIA': 'ARGELIA'
+    };
+    
+    apiMatches.forEach(apiMatch => {
+      if (apiMatch.status === 'completed' || apiMatch.status === 'finished') {
+        const homeName = apiMatch.home_team.name.trim().toUpperCase();
+        const awayName = apiMatch.away_team.name.trim().toUpperCase();
+        
+        const translatedHome = nameMap[homeName] || homeName;
+        const translatedAway = nameMap[awayName] || awayName;
+        
+        // Find local match
+        const localMatch = rawMatches.find(m => {
+          if (m.id <= 72) {
+            return (m.team1.trim().toUpperCase() === translatedHome && m.team2.trim().toUpperCase() === translatedAway) ||
+                   (m.team1.trim().toUpperCase() === translatedAway && m.team2.trim().toUpperCase() === translatedHome);
+          } else {
+            const resolved = state.resolvedKnockoutMatches[m.id];
+            if (resolved && resolved.team1 && resolved.team2) {
+              const resHome = resolved.team1.trim().toUpperCase();
+              const resAway = resolved.team2.trim().toUpperCase();
+              return (resHome === translatedHome && resAway === translatedAway) ||
+                     (resHome === translatedAway && resAway === translatedHome);
+            }
+            return false;
+          }
+        });
+        
+        if (localMatch) {
+          const isHomeOriginal = localMatch.team1.trim().toUpperCase() === translatedHome;
+          state.realScores[localMatch.id] = {
+            homeScore: isHomeOriginal ? apiMatch.home_team.goals : apiMatch.away_team.goals,
+            awayScore: isHomeOriginal ? apiMatch.away_team.goals : apiMatch.home_team.goals,
+            played: true
+          };
+        }
+      }
+    });
+    console.log('Successfully loaded scores from API.');
+  } catch (e) {
+    console.warn('API fetch failed, utilizing local fallbackScores database:', e);
+  }
+  
+  calculateProdeStats();
+  renderActiveTab();
+}
+
 // --- App Initialization ---
 export function initApp() {
   initializeGroupTeams();
@@ -1079,6 +1322,9 @@ export function initApp() {
       renderActiveTab();
     });
   });
+  
+  // Async fetch real world cup results
+  fetchRealScores();
   
   renderActiveTab();
 }
