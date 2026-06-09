@@ -980,6 +980,11 @@ body::after {
   box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.25);
 }
 
+.glass-select option {
+  background: #0c0f1d;
+  color: var(--color-text-main);
+}
+
 /* --- Empty state & matches layout --- */
 .empty-matches {
   text-align: center;
