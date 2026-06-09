@@ -911,7 +911,7 @@ body::after {
   box-shadow: 0 0 10px var(--accent-cyan-glow);
 }
 
-.filter-team {
+.filter-team, .filter-date {
   display: flex;
   align-items: center;
   gap: 10px;

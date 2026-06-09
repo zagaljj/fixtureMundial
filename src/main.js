@@ -16,7 +16,8 @@ export const state = {
   favorites: [], // list of favorite team names (uppercase)
   filters: {
     view: 'all', // 'all' | 'favorites'
-    selectedTeam: 'all' // 'all' | specific team name (raw)
+    selectedTeam: 'all', // 'all' | specific team name (raw)
+    selectedDate: 'all' // 'all' | specific date YYYY-MM-DD
   },
   realScores: {}, // matchId -> { homeScore, awayScore, played }
   prodePoints: 0,
@@ -158,7 +159,12 @@ export function loadState() {
         state.timezone = parsed.timezone || 'auto';
         state.activeTab = parsed.activeTab || 'portada';
         state.favorites = parsed.favorites || [];
-        state.filters = parsed.filters || { view: 'all', selectedTeam: 'all' };
+        state.filters = {
+          view: 'all',
+          selectedTeam: 'all',
+          selectedDate: 'all',
+          ...(parsed.filters || {})
+        };
         state.selectedTeamDetails = parsed.selectedTeamDetails || 'ARGENTINA';
         
         // Ensure all matches exist in state.matches
@@ -604,7 +610,19 @@ function renderIngreso() {
   });
   allTeams.sort();
   
-  // Filter matches based on favorites and selected team
+  // Compile all unique dates for the date filter selector
+  const uniqueDatesMap = {};
+  rawMatches.forEach(m => {
+    if (!uniqueDatesMap[m.dateStr]) {
+      uniqueDatesMap[m.dateStr] = m.dateLong;
+    }
+  });
+  const allDates = Object.keys(uniqueDatesMap).sort().map(dateStr => ({
+    dateStr,
+    dateLong: uniqueDatesMap[dateStr]
+  }));
+  
+  // Filter matches based on favorites, selected team, and selected date
   const filteredMatches = rawMatches.filter(m => {
     const resolved = state.resolvedKnockoutMatches[m.id] || null;
     
@@ -624,6 +642,13 @@ function renderIngreso() {
     // 2. Specific Team filter
     if (state.filters.selectedTeam !== 'all') {
       if (cleanT1 !== state.filters.selectedTeam && cleanT2 !== state.filters.selectedTeam) {
+        return false;
+      }
+    }
+    
+    // 3. Specific Date filter
+    if (state.filters.selectedDate && state.filters.selectedDate !== 'all') {
+      if (m.dateStr !== state.filters.selectedDate) {
         return false;
       }
     }
@@ -659,6 +684,18 @@ function renderIngreso() {
           ${allTeams.map(team => `
             <option value="${team.trim().toUpperCase()}" ${state.filters.selectedTeam === team.trim().toUpperCase() ? 'selected' : ''}>
               ${getTeamFlagAndName(team)}
+            </option>
+          `).join('')}
+        </select>
+      </div>
+
+      <div class="filter-date">
+        <label for="date-filter-select" class="filter-select-label">Fecha:</label>
+        <select id="date-filter-select" class="glass-select">
+          <option value="all" ${state.filters.selectedDate === 'all' ? 'selected' : ''}>Todas</option>
+          ${allDates.map(d => `
+            <option value="${d.dateStr}" ${state.filters.selectedDate === d.dateStr ? 'selected' : ''}>
+              ${d.dateLong}
             </option>
           `).join('')}
         </select>
@@ -859,6 +896,15 @@ function renderIngreso() {
   if (teamSelect) {
     teamSelect.addEventListener('change', (e) => {
       state.filters.selectedTeam = e.target.value;
+      saveState();
+      renderIngreso();
+    });
+  }
+  
+  const dateSelect = container.querySelector('#date-filter-select');
+  if (dateSelect) {
+    dateSelect.addEventListener('change', (e) => {
+      state.filters.selectedDate = e.target.value;
       saveState();
       renderIngreso();
     });
