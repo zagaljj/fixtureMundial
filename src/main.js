@@ -1,7 +1,7 @@
 import { rawMatches } from './data/matches.js';
 import { tmt } from './data/tmt.js';
 import { predictMatch, formatRachaHTML } from './data/predictor.js';
-import fallbackRealScores from './data/real-scores.json';
+import fallbackRealScores from './data/real-scores.json' with { type: 'json' };
 import { teamDetails } from './data/team-details.js';
 import { teamRatings } from './data/ratings.js';
 
@@ -9,22 +9,24 @@ import { teamRatings } from './data/ratings.js';
 export const state = {
   matches: {}, // matchId -> { homeScore: null, awayScore: null, winnerOverride: null }
   timezone: 'auto', // 'auto' or explicit timezone string
-  activeTab: 'portada', // 'portada', 'ingreso', 'grupos', 'fase-final'
+  activeTab: 'portada', // 'portada', 'grupos', 'fase-final', 'selecciones'
   groupStandings: {}, // groupLetter -> array of team standings
   bestThirds: [], // array of ranked third place teams
   resolvedKnockoutMatches: {}, // matchId -> { team1, team2, winner, isTied }
   favorites: [], // list of favorite team names (uppercase)
   filters: {
-    view: 'all', // 'all' | 'favorites'
-    selectedTeam: 'all', // 'all' | specific team name (raw)
-    selectedDate: 'all' // 'all' | specific date YYYY-MM-DD
+    selectedGroup: 'all', // 'all' | 'A'-'L'
+    selectedConf: 'all', // 'all' | specific confederation
+    calendarPhase: 'all', // 'all' | 'groups' | 'knockout'
+    calendarTeam: 'all', // 'all' | specific team name (uppercase)
+    calendarFavoritesOnly: false // boolean
   },
   realScores: {}, // matchId -> { homeScore, awayScore, played }
   prodePoints: 0,
   prodeExacts: 0,
   prodeOutcome: 0,
   prodeTotalPlayed: 0,
-  selectedTeamDetails: 'ARGENTINA' // default team to show in selecciones view
+  selectedTeamDetails: 'ARGENTINA' // default team to show detail modal for
 };
 
 // --- Team Flags Map ---
@@ -48,13 +50,13 @@ const teamFlags = {
   'CURAZAO': '🇨🇼',
   'ECUADOR': '🇪🇨',
   'EGIPTO': '🇪🇬',
-  'ESCOCIA': '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+  'ESCOCIA': '🏴&zwj;☠️', // Will display Scotland flag or fallback emoji
   'ESPAÑA': '🇪🇸',
   'ESTADOS UNIDOS': '🇺🇸',
   'FRANCIA': '🇫🇷',
   'GHANA': '🇬🇭',
   'HAITÍ': '🇭🇹',
-  'INGLATERRA': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+  'INGLATERRA': '🏴&zwj;☠️',
   'IRAK': '🇮🇶',
   'IRÁN': '🇮🇷',
   'JAPÓN': '🇯🇵',
@@ -79,6 +81,25 @@ const teamFlags = {
   'UZBEKISTÁN': '🇺🇿'
 };
 
+// Handle UK flag lookups specifically
+teamFlags['ESCOCIA'] = '🏴󠁧󠁢󠁳󠁣󠁴󠁿';
+teamFlags['INGLATERRA'] = '🏴󠁧󠁢󠁥󠁮󠁧󠁿';
+
+const teamConfederations = {
+  'MÉXICO': 'CONCACAF', 'SUDÁFRICA': 'CAF', 'COREA DEL SUR': 'AFC', 'REP. CHECA': 'UEFA',
+  'CANADÁ': 'CONCACAF', 'SUIZA': 'UEFA', 'CATAR': 'AFC', 'BOSNIA Y HERZEG.': 'UEFA',
+  'BRASIL': 'CONMEBOL', 'MARRUECOS': 'CAF', 'HAITÍ': 'CONCACAF', 'ESCOCIA': 'UEFA',
+  'ESTADOS UNIDOS': 'CONCACAF', 'PARAGUAY': 'CONMEBOL', 'AUSTRALIA': 'AFC', 'TURQUÍA': 'UEFA',
+  'ALEMANIA': 'UEFA', 'CURAZAO': 'CONCACAF', 'COSTA DE MARFIL': 'CAF', 'ECUADOR': 'CONMEBOL',
+  'PAÍSES BAJOS': 'UEFA', 'JAPÓN': 'AFC', 'TÚNEZ': 'CAF', 'SUECIA': 'UEFA',
+  'BÉLGICA': 'UEFA', 'EGIPTO': 'CAF', 'IRÁN': 'AFC', 'NUEVA ZELANDA': 'OFC',
+  'ESPAÑA': 'UEFA', 'CABO VERDE': 'CAF', 'ARABIA SAUDITA': 'AFC', 'URUGUAY': 'CONMEBOL',
+  'FRANCIA': 'UEFA', 'SENEGAL': 'CAF', 'NORUEGA': 'UEFA', 'IRAK': 'AFC',
+  'ARGENTINA': 'CONMEBOL', 'ARGELIA': 'CAF', 'AUSTRIA': 'UEFA', 'JORDANIA': 'AFC',
+  'PORTUGAL': 'UEFA', 'COLOMBIA': 'CONMEBOL', 'UZBEKISTÁN': 'AFC', 'REP. DEL CONGO': 'CAF',
+  'INGLATERRA': 'UEFA', 'CROACIA': 'UEFA', 'GHANA': 'CAF', 'PANAMÁ': 'CONCACAF'
+};
+
 export function getTeamFlagAndName(teamName) {
   if (!teamName) return '';
   const cleanName = teamName.trim().toUpperCase();
@@ -90,43 +111,8 @@ export function getTeamDisplayName(teamName) {
   if (!teamName) return '';
   const cleanName = teamName.trim().toUpperCase();
   const flag = teamFlags[cleanName];
-  if (!flag) return teamName;
-  
-  const isFav = state.favorites.includes(cleanName);
-  const favClass = isFav ? 'active' : '';
-  
-  return `
-    <span class="team-display">
-      <button class="fav-btn ${favClass}" onclick="event.stopPropagation(); toggleFavorite('${cleanName}')" title="Marcar como favorito">${isFav ? '★' : '☆'}</button>
-      <span class="flag-emoji">${flag}</span>
-      <span class="team-label team-link" onclick="event.stopPropagation(); window.showTeamDetails('${cleanName}')" title="Ver detalles de la selección">${teamName}</span>
-    </span>
-  `;
+  return flag ? `${flag} ${teamName}` : teamName;
 }
-
-// Window level helper to show team details in its dedicated tab
-window.showTeamDetails = function(teamName) {
-  const cleanName = teamName.trim().toUpperCase();
-  if (teamDetails[cleanName]) {
-    state.activeTab = 'selecciones';
-    state.selectedTeamDetails = cleanName;
-    saveState();
-    renderActiveTab();
-  }
-};
-
-// Window level helper to toggle favorite status
-window.toggleFavorite = function(teamName) {
-  const cleanName = teamName.trim().toUpperCase();
-  const idx = state.favorites.indexOf(cleanName);
-  if (idx === -1) {
-    state.favorites.push(cleanName);
-  } else {
-    state.favorites.splice(idx, 1);
-  }
-  saveState();
-  renderActiveTab();
-};
 
 // --- Group Definitions ---
 export const groupTeams = {};
@@ -160,12 +146,19 @@ export function loadState() {
         state.activeTab = parsed.activeTab || 'portada';
         state.favorites = parsed.favorites || [];
         state.filters = {
-          view: 'all',
-          selectedTeam: 'all',
-          selectedDate: 'all',
+          selectedGroup: 'all',
+          selectedConf: 'all',
+          calendarPhase: 'all',
+          calendarTeam: 'all',
+          calendarFavoritesOnly: false,
           ...(parsed.filters || {})
         };
         state.selectedTeamDetails = parsed.selectedTeamDetails || 'ARGENTINA';
+        
+        // Safety check to bypass old activeTab value 'ingreso'
+        if (state.activeTab === 'ingreso') {
+          state.activeTab = 'grupos';
+        }
         
         // Ensure all matches exist in state.matches
         rawMatches.forEach(m => {
@@ -206,7 +199,6 @@ export function saveState() {
 export function formatMatchDateTime(dateStr, timeStr) {
   if (!dateStr || !timeStr) return { date: '', time: '' };
   
-  // Format Eastern Time/New York as base date representation
   const dtStr = `${dateStr}T${timeStr}`;
   const d = new Date(dtStr);
   if (isNaN(d.getTime())) return { date: dateStr, time: timeStr };
@@ -513,7 +505,7 @@ export function renderActiveTab() {
   
   // Run specific view renders
   if (state.activeTab === 'portada') renderPortada();
-  if (state.activeTab === 'ingreso') renderIngreso();
+  if (state.activeTab === 'calendario') renderCalendario();
   if (state.activeTab === 'grupos') renderGrupos();
   if (state.activeTab === 'fase-final') renderFaseFinal();
   if (state.activeTab === 'selecciones') renderSelecciones();
@@ -541,7 +533,7 @@ function renderPortada() {
     const totalAcc = state.prodeExacts + state.prodeOutcome;
     const eff = (totalAcc / state.prodeTotalPlayed * 100).toFixed(0);
     prodeCard = `
-      <div class="prode-stats-box glass-panel">
+      <div class="prode-stats-box">
         <h4>🏆 TU RENDIMIENTO PRODE</h4>
         <div class="prode-row">
           <div class="prode-col">
@@ -566,7 +558,7 @@ function renderPortada() {
   }
   
   container.innerHTML = `
-    <div class="welcome-card glass">
+    <div class="welcome-card">
       <h1>Copa Mundial de la FIFA 2026™</h1>
       <p class="subtitle">Simulador de Fixture Interactivo</p>
       <div class="divider"></div>
@@ -597,363 +589,311 @@ function renderPortada() {
   `;
 }
 
-function renderIngreso() {
-  const container = document.getElementById('ingreso-view');
-  if (!container) return;
+export function getMatchTeamsInfo(matchId) {
+  const m = rawMatches.find(x => x.id === matchId);
+  if (!m) return { t1Name: '', t2Name: '', t1Flag: '🏳️', t2Flag: '🏳️', t1Label: '', t2Label: '', isUnresolved1: true, isUnresolved2: true };
   
-  // Compile all unique teams for the team filter selector
-  const allTeams = [];
-  Object.values(groupTeams).forEach(teams => {
-    teams.forEach(t => {
-      if (!allTeams.includes(t)) allTeams.push(t);
+  let t1Name = m.team1;
+  let t2Name = m.team2;
+  const isKnockout = matchId >= 73 && matchId <= 104;
+  
+  if (isKnockout) {
+    const resolved = state.resolvedKnockoutMatches[matchId];
+    if (resolved) {
+      t1Name = resolved.team1;
+      t2Name = resolved.team2;
+    }
+  }
+  
+  const isUnresolved = (name) => {
+    return !name || name.startsWith('Falta') || name.startsWith('3º') || name.startsWith('Por definir');
+  };
+  
+  const getSeedText = (mId, side) => {
+    const seeds = {
+      73: ['2°A', '2°B'], 74: ['1°C', '2°F'], 75: ['1°E', '3°E/F/G/H'], 76: ['1°F', '2°C'],
+      77: ['2°E', '2°I'], 78: ['1°I', '3°G/H/I/J'], 79: ['1°A', '3°A/B/C/D'], 80: ['1°L', '3°K/L'],
+      81: ['1°G', '3°H/I/J/K'], 82: ['1°D', '3°D/E/F/G'], 83: ['1°H', '2°J'], 84: ['2°K', '2°L'],
+      85: ['1°B', '3°B/C/D/E'], 86: ['2°D', '2°G'], 87: ['1°J', '2°H'], 88: ['1°K', '3°J/K/L']
+    };
+    if (seeds[mId]) {
+      return side === 1 ? seeds[mId][0] : seeds[mId][1];
+    }
+    const matchParents = {
+      89: ['Ganador 73', 'Ganador 75'],
+      90: ['Ganador 74', 'Ganador 77'],
+      91: ['Ganador 76', 'Ganador 78'],
+      92: ['Ganador 79', 'Ganador 80'],
+      93: ['Ganador 83', 'Ganador 84'],
+      94: ['Ganador 81', 'Ganador 82'],
+      95: ['Ganador 86', 'Ganador 88'],
+      96: ['Ganador 85', 'Ganador 87'],
+      97: ['Ganador 89', 'Ganador 90'],
+      98: ['Ganador 93', 'Ganador 94'],
+      99: ['Ganador 91', 'Ganador 92'],
+      100: ['Ganador 95', 'Ganador 96'],
+      101: ['Ganador 97', 'Ganador 98'],
+      102: ['Ganador 99', 'Ganador 100'],
+      103: ['Perdedor 101', 'Perdedor 102'],
+      104: ['Ganador 101', 'Ganador 102']
+    };
+    if (matchParents[mId]) {
+      return side === 1 ? matchParents[mId][0] : matchParents[mId][1];
+    }
+    return '';
+  };
+  
+  const isUn1 = isUnresolved(t1Name);
+  const isUn2 = isUnresolved(t2Name);
+  
+  const t1Label = isUn1 ? getSeedText(matchId, 1) : t1Name;
+  const t2Label = isUn2 ? getSeedText(matchId, 2) : t2Name;
+  
+  const t1Flag = isUn1 ? '🏳️' : (teamFlags[t1Name.toUpperCase()] || '🏳️');
+  const t2Flag = isUn2 ? '🏳️' : (teamFlags[t2Name.toUpperCase()] || '🏳️');
+  
+  return {
+    t1Name: isUn1 ? '' : t1Name,
+    t2Name: isUn2 ? '' : t2Name,
+    t1Label: t1Label || 'Por definir',
+    t2Label: t2Label || 'Por definir',
+    t1Flag,
+    t2Flag,
+    isUnresolved1: isUn1,
+    isUnresolved2: isUn2
+  };
+}
+
+export function renderCalendario() {
+  const container = document.getElementById('calendario-view');
+  if (!container) return;
+
+  const currentPhase = state.filters.calendarPhase || 'all';
+  const currentTeam = state.filters.calendarTeam || 'all';
+  const favoritesOnly = state.filters.calendarFavoritesOnly || false;
+
+  const allTeamsSet = new Set();
+  rawMatches.forEach(m => {
+    if (m.team1) allTeamsSet.add(m.team1);
+    if (m.team2) allTeamsSet.add(m.team2);
+  });
+  const allTeams = Array.from(allTeamsSet).sort();
+
+  const filteredMatches = [];
+  rawMatches.forEach(m => {
+    const teamsInfo = getMatchTeamsInfo(m.id);
+
+    if (currentPhase === 'groups' && m.id >= 73) return;
+    if (currentPhase === 'knockout' && m.id < 73) return;
+
+    const isTeam1Match = teamsInfo.t1Name && teamsInfo.t1Name.toUpperCase() === currentTeam;
+    const isTeam2Match = teamsInfo.t2Name && teamsInfo.t2Name.toUpperCase() === currentTeam;
+    if (currentTeam !== 'all' && !isTeam1Match && !isTeam2Match) return;
+
+    if (favoritesOnly) {
+      const isT1Fav = teamsInfo.t1Name && state.favorites.includes(teamsInfo.t1Name.toUpperCase());
+      const isT2Fav = teamsInfo.t2Name && state.favorites.includes(teamsInfo.t2Name.toUpperCase());
+      if (!isT1Fav && !isT2Fav) return;
+    }
+
+    const dtStr = `${m.dateStr}T${m.timeStr}`;
+    const dateObj = new Date(dtStr);
+    const formatted = formatMatchDateTime(m.dateStr, m.timeStr);
+
+    filteredMatches.push({
+      match: m,
+      teamsInfo,
+      dateObj,
+      localDate: formatted.date,
+      localTime: formatted.time
     });
   });
-  allTeams.sort();
-  
-  // Compile all unique dates for the date filter selector
-  const uniqueDatesMap = {};
-  rawMatches.forEach(m => {
-    if (!uniqueDatesMap[m.dateStr]) {
-      uniqueDatesMap[m.dateStr] = m.dateLong;
+
+  filteredMatches.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+
+  const dayGroups = {};
+  filteredMatches.forEach(fm => {
+    if (!dayGroups[fm.localDate]) {
+      dayGroups[fm.localDate] = [];
     }
+    dayGroups[fm.localDate].push(fm);
   });
-  const allDates = Object.keys(uniqueDatesMap).sort().map(dateStr => ({
-    dateStr,
-    dateLong: uniqueDatesMap[dateStr]
-  }));
-  
-  // Filter matches based on favorites, selected team, and selected date
-  const filteredMatches = rawMatches.filter(m => {
-    const resolved = state.resolvedKnockoutMatches[m.id] || null;
-    
-    const t1 = (resolved ? resolved.team1 : m.team1) || '';
-    const t2 = (resolved ? resolved.team2 : m.team2) || '';
-    
-    const cleanT1 = t1.trim().toUpperCase();
-    const cleanT2 = t2.trim().toUpperCase();
-    
-    // 1. Favorites filter
-    if (state.filters.view === 'favorites') {
-      const isT1Fav = state.favorites.includes(cleanT1);
-      const isT2Fav = state.favorites.includes(cleanT2);
-      if (!isT1Fav && !isT2Fav) return false;
-    }
-    
-    // 2. Specific Team filter
-    if (state.filters.selectedTeam !== 'all') {
-      if (cleanT1 !== state.filters.selectedTeam && cleanT2 !== state.filters.selectedTeam) {
-        return false;
-      }
-    }
-    
-    // 3. Specific Date filter
-    if (state.filters.selectedDate && state.filters.selectedDate !== 'all') {
-      if (m.dateStr !== state.filters.selectedDate) {
-        return false;
-      }
-    }
-    
-    return true;
-  });
-  
-  // Group matches by group/stage header
-  const matchesByGroup = {};
-  filteredMatches.forEach(m => {
-    if (!matchesByGroup[m.group]) {
-      matchesByGroup[m.group] = [];
-    }
-    matchesByGroup[m.group].push(m);
-  });
-  
+
   let html = `
     <div class="header-row">
-      <h2>Ingreso de Resultados</h2>
-      <p>Carga los resultados de todos los partidos del fixture para calcular el torneo en tiempo real.</p>
+      <h2>Calendario de Partidos</h2>
+      <p>Copa Mundial FIFA 2026™ · Cronograma por día y horarios adaptados a tu zona horaria</p>
     </div>
-    
-    <div class="filter-bar glass">
-      <div class="filter-views">
-        <button class="filter-btn ${state.filters.view === 'all' ? 'active' : ''}" id="filter-view-all">Todos los Partidos</button>
-        <button class="filter-btn ${state.filters.view === 'favorites' ? 'active' : ''}" id="filter-view-favs">⭐ Favoritos</button>
-      </div>
-      
-      <div class="filter-team">
-        <label for="team-filter-select" class="filter-select-label">Selección:</label>
-        <select id="team-filter-select" class="glass-select">
-          <option value="all" ${state.filters.selectedTeam === 'all' ? 'selected' : ''}>Todas</option>
-          ${allTeams.map(team => `
-            <option value="${team.trim().toUpperCase()}" ${state.filters.selectedTeam === team.trim().toUpperCase() ? 'selected' : ''}>
-              ${getTeamFlagAndName(team)}
-            </option>
+
+    <div class="filter-bar">
+      <button class="f-btn ${currentPhase === 'all' ? 'active' : ''}" data-phase="all">Todos</button>
+      <button class="f-btn ${currentPhase === 'groups' ? 'active' : ''}" data-phase="groups">Fase de Grupos</button>
+      <button class="f-btn ${currentPhase === 'knockout' ? 'active' : ''}" data-phase="knockout">Fase Final</button>
+      <button class="f-btn favs-btn ${favoritesOnly ? 'active' : ''}" id="calFavsBtn">⭐ Favoritos</button>
+
+      <div class="filter-team" style="display: flex; align-items: center; gap: 8px; margin-left: 12px;">
+        <label for="calTeamSelect" class="tz-label" style="font-size: 11px;">Selección:</label>
+        <select id="calTeamSelect" class="tz-select glass-select" style="padding: 4px 8px;">
+          <option value="all">Todas</option>
+          ${allTeams.map(t => `
+            <option value="${t.toUpperCase()}" ${currentTeam === t.toUpperCase() ? 'selected' : ''}>${t}</option>
           `).join('')}
         </select>
       </div>
 
-      <div class="filter-date">
-        <label for="date-filter-select" class="filter-select-label">Fecha:</label>
-        <select id="date-filter-select" class="glass-select">
-          <option value="all" ${state.filters.selectedDate === 'all' ? 'selected' : ''}>Todas</option>
-          ${allDates.map(d => `
-            <option value="${d.dateStr}" ${state.filters.selectedDate === d.dateStr ? 'selected' : ''}>
-              ${d.dateLong}
-            </option>
-          `).join('')}
-        </select>
-      </div>
+      <button class="reset-btn" id="calResetBtn">Borrar filtros</button>
     </div>
-    
-    <div class="matches-list-container">
+
+    <div class="calendar-list">
   `;
-  
-  if (filteredMatches.length === 0) {
+
+  const dateKeys = Object.keys(dayGroups);
+  if (dateKeys.length === 0) {
     html += `
-      <div class="empty-matches glass">
-        <p>No se encontraron partidos para los filtros aplicados.</p>
+      <div class="empty-favorites" style="text-align: center; padding: 60px 40px; color: var(--text2);">
+        <p style="font-size: 16px; margin-bottom: 10px; font-weight: 600;">⚽ No se encontraron partidos con los filtros seleccionados.</p>
+        <p style="font-size: 13px;">Intentá restablecer los filtros para ver la lista completa.</p>
       </div>
     `;
   } else {
-    Object.keys(matchesByGroup).forEach(groupHeading => {
+    dateKeys.forEach(dateStr => {
       html += `
-        <div class="stage-section glass">
-          <h3 class="stage-title">${groupHeading}</h3>
-          <div class="stage-matches">
+        <div class="day-group">
+          <div class="day-header glass-day-header">${dateStr}</div>
+          <div class="day-matches">
       `;
-      
-      matchesByGroup[groupHeading].forEach(m => {
-        const pred = state.matches[m.id];
-        const resolved = state.resolvedKnockoutMatches[m.id] || null;
-        const dt = formatMatchDateTime(m.dateStr, m.timeStr);
-        
-        let t1Name = m.team1;
-        let t2Name = m.team2;
-        let isClickableTie = false;
-        
-        if (resolved) {
-          t1Name = resolved.team1 || `Por definir (G${m.id})`;
-          t2Name = resolved.team2 || `Por definir (G${m.id})`;
-          isClickableTie = resolved.isTied;
-        }
-        
-        const hsVal = pred.homeScore !== null ? pred.homeScore : '';
-        const asVal = pred.awayScore !== null ? pred.awayScore : '';
-        
-        const t1Class = (resolved && resolved.winner === t1Name && resolved.winner) ? 'winner' : '';
-        const t2Class = (resolved && resolved.winner === t2Name && resolved.winner) ? 'winner' : '';
-        
-        // Mapear el resultado real
-        const real = state.realScores[m.id] || { homeScore: null, awayScore: null, played: false };
-        let realBadgeHtml = '';
-        let cardClass = '';
-        
-        if (real.played) {
-          const rhs = parseInt(real.homeScore);
-          const ras = parseInt(real.awayScore);
-          
-          let pointsLabel = '0 pts';
-          let badgeClass = 'prode-fail';
-          cardClass = 'match-card-fail';
-          
-          if (pred.homeScore !== null && pred.awayScore !== null && pred.homeScore !== '' && pred.awayScore !== '') {
-            const phs = parseInt(pred.homeScore);
-            const pas = parseInt(pred.awayScore);
-            
-            if (phs === rhs && pas === ras) {
-              pointsLabel = '+3 pts (Exacto)';
-              badgeClass = 'prode-exact';
-              cardClass = 'match-card-exact';
-            } else {
-              const predDiff = phs - pas;
-              const realDiff = rhs - ras;
-              if ((predDiff > 0 && realDiff > 0) || (predDiff < 0 && realDiff < 0) || (predDiff === 0 && realDiff === 0)) {
-                pointsLabel = '+1 pt (Acierto)';
-                badgeClass = 'prode-outcome';
-                cardClass = 'match-card-outcome';
-              }
-            }
-          }
-          
-          realBadgeHtml = `
-            <div class="real-score-badge-row">
-              <span class="real-score-label">Resultado Real: <strong>${rhs} - ${ras}</strong></span>
-              <span class="prode-points-badge ${badgeClass}">${pointsLabel}</span>
-            </div>
-          `;
-        }
-        
-        // Predict match probabilities and score
-        const predInfo = predictMatch(t1Name, t2Name);
-        const hasPred = predInfo.score1 !== '-';
-        
-        html += `
-          <div class="match-card ${cardClass}" data-match-id="${m.id}">
-            <div class="match-meta">
-              <span class="match-num">Partido #${m.id}</span>
-              <span class="match-date">${dt.date} - ${dt.time} hs</span>
-              <span class="match-stadium">${m.stadiumAbbrev}</span>
-            </div>
-            
-            <div class="match-teams-row">
-              <div class="team-col team-home ${t1Class}">
-                <span class="team-name">${getTeamDisplayName(t1Name)}</span>
-              </div>
-              
-              <div class="score-col">
-                <input type="number" min="0" class="score-input home-input" data-match-id="${m.id}" value="${hsVal}" placeholder="-" />
-                <span class="score-sep">-</span>
-                <input type="number" min="0" class="score-input away-input" data-match-id="${m.id}" value="${asVal}" placeholder="-" />
-              </div>
-              
-              <div class="team-col team-away ${t2Class}">
-                <span class="team-name">${getTeamDisplayName(t2Name)}</span>
-              </div>
-            </div>
-        `;
-        
-        // If draw resolution is needed, render buttons
-        if (isClickableTie) {
-          html += `
-            <div class="draw-resolution-box">
-              <p>Partido empatado. Seleccioná el equipo que avanza a la siguiente ronda:</p>
-              <div class="draw-btns">
-                <button class="draw-btn ${pred.winnerOverride === t1Name ? 'selected' : ''}" data-match-id="${m.id}" data-winner="${t1Name}">${getTeamFlagAndName(t1Name)}</button>
-                <button class="draw-btn ${pred.winnerOverride === t2Name ? 'selected' : ''}" data-match-id="${m.id}" data-winner="${t2Name}">${getTeamFlagAndName(t2Name)}</button>
-              </div>
-            </div>
-          `;
-        }
-        
-        // Prediction Widget (solo si el partido no se jugó)
-        if (hasPred && !real.played) {
-          html += `
-            <div class="match-predictions glass-panel">
-              <div class="predictions-header">
-                <span class="pred-title">Predicción (Historial & Elo)</span>
-                <span class="pred-score">Sugerido: <strong>${predInfo.score1} - ${predInfo.score2}</strong></span>
-              </div>
-              
-              <div class="prob-bar-container">
-                <div class="prob-segment win1-seg" style="width: ${predInfo.win1}%" title="Ganará ${t1Name}: ${predInfo.win1}%">
-                  <span class="prob-val">${predInfo.win1}%</span>
-                </div>
-                <div class="prob-segment draw-seg" style="width: ${predInfo.draw}%" title="Empate: ${predInfo.draw}%">
-                  <span class="prob-val">${predInfo.draw}%</span>
-                </div>
-                <div class="prob-segment win2-seg" style="width: ${predInfo.win2}%" title="Ganará ${t2Name}: ${predInfo.win2}%">
-                  <span class="prob-val">${predInfo.win2}%</span>
-                </div>
-              </div>
-              
-              <div class="rachas-row">
-                <div class="team-racha">
-                  <span class="racha-label">Racha:</span>
-                  ${formatRachaHTML(predInfo.racha1)}
-                </div>
-                <div class="team-racha">
-                  <span class="racha-label">Racha:</span>
-                  ${formatRachaHTML(predInfo.racha2)}
-                </div>
-              </div>
-            </div>
-          `;
-        }
-        
-        // Badge de resultado real (si el partido ya finalizó)
-        if (real.played) {
-          html += realBadgeHtml;
-        }
-        
-        html += `</div>`;
-      });
-      
-      html += `</div></div>`;
-    });
-  }
-  
-  html += `</div></div></div>`;
-  container.innerHTML = html;
-  
-  // Bind events
 
-  const viewAllBtn = container.querySelector('#filter-view-all');
-  if (viewAllBtn) {
-    viewAllBtn.addEventListener('click', () => {
-      state.filters.view = 'all';
-      saveState();
-      renderIngreso();
+      dayGroups[dateStr].forEach(fm => {
+        const m = fm.match;
+        const ti = fm.teamsInfo;
+        const pred = state.matches[m.id];
+        const played = pred && pred.homeScore !== null && pred.awayScore !== null;
+        const prodeCls = getProdeMatchClass(m.id);
+
+        const sc = played
+          ? `<span class="sv">${pred.homeScore}</span><span class="ss"> – </span><span class="sv">${pred.awayScore}</span>`
+          : `<span class="sv">VS</span>`;
+
+        const isT1Fav = ti.t1Name && state.favorites.includes(ti.t1Name.toUpperCase());
+        const isT2Fav = ti.t2Name && state.favorites.includes(ti.t2Name.toUpperCase());
+        const t1Star = isT1Fav ? '<span class="fav-star">★</span>' : '';
+        const t2Star = isT2Fav ? '<span class="fav-star">★</span>' : '';
+
+        let stageTag = m.group || '';
+        if (m.id >= 73 && m.id <= 88) stageTag = 'Dieciseisavos';
+        else if (m.id >= 89 && m.id <= 96) stageTag = 'Octavos';
+        else if (m.id >= 97 && m.id <= 100) stageTag = 'Cuartos';
+        else if (m.id === 101 || m.id === 102) stageTag = 'Semifinal';
+        else if (m.id === 103) stageTag = 'Tercer Puesto';
+        else if (m.id === 104) stageTag = 'Final';
+
+        html += `
+          <div class="cal-row ${prodeCls}" data-match-id="${m.id}">
+            <div class="cal-time-col">
+              <span class="cal-time">${fm.localTime}</span>
+              <span class="cal-stage">${stageTag}</span>
+            </div>
+            
+            <div class="cal-team home ${ti.isUnresolved1 ? 'tbd' : ''}">
+              <span class="cal-name" ${!ti.isUnresolved1 ? `onclick="event.stopPropagation(); window.openSquadModal('${ti.t1Name.toUpperCase()}')" style="cursor: pointer;" title="Ver plantel"` : ''}>
+                ${ti.t1Label} ${t1Star}
+              </span>
+              <span class="cal-flag">${ti.t1Flag}</span>
+            </div>
+            
+            <div class="m-score ${played ? 'done' : 'pending'}">${sc}</div>
+            
+            <div class="cal-team away ${ti.isUnresolved2 ? 'tbd' : ''}">
+              <span class="cal-flag">${ti.t2Flag}</span>
+              <span class="cal-name" ${!ti.isUnresolved2 ? `onclick="event.stopPropagation(); window.openSquadModal('${ti.t2Name.toUpperCase()}')" style="cursor: pointer;" title="Ver plantel"` : ''}>
+                ${ti.t2Label} ${t2Star}
+              </span>
+            </div>
+            
+            <div class="cal-stadium" title="${m.stadium}">
+              ${m.stadiumAbbrev}
+            </div>
+          </div>
+        `;
+      });
+
+      html += `
+          </div>
+        </div>
+      `;
     });
   }
-  
-  const viewFavsBtn = container.querySelector('#filter-view-favs');
-  if (viewFavsBtn) {
-    viewFavsBtn.addEventListener('click', () => {
-      state.filters.view = 'favorites';
-      saveState();
-      renderIngreso();
-    });
-  }
-  
-  const teamSelect = container.querySelector('#team-filter-select');
-  if (teamSelect) {
-    teamSelect.addEventListener('change', (e) => {
-      state.filters.selectedTeam = e.target.value;
-      saveState();
-      renderIngreso();
-    });
-  }
-  
-  const dateSelect = container.querySelector('#date-filter-select');
-  if (dateSelect) {
-    dateSelect.addEventListener('change', (e) => {
-      state.filters.selectedDate = e.target.value;
-      saveState();
-      renderIngreso();
-    });
-  }
-  
-  container.querySelectorAll('.score-input').forEach(input => {
-    input.addEventListener('input', e => {
-      const matchId = parseInt(e.target.dataset.matchId);
-      const isHome = e.target.classList.contains('home-input');
-      const val = e.target.value;
-      
-      if (!state.matches[matchId]) {
-        state.matches[matchId] = { homeScore: null, awayScore: null, winnerOverride: null };
-      }
-      
-      if (isHome) {
-        state.matches[matchId].homeScore = val !== '' ? parseInt(val) : null;
-      } else {
-        state.matches[matchId].awayScore = val !== '' ? parseInt(val) : null;
-      }
-      
-      state.matches[matchId].winnerOverride = null;
-      
-      recalculateTournament();
-      calculateProdeStats();
-      saveState();
-      
-      debounce(() => {
-        renderIngreso();
-        // Re-renderizar portada para actualizar puntos
-        const navPortada = document.getElementById('nav-portada');
-        if (navPortada && state.activeTab === 'portada') renderPortada();
-      }, 800)();
-    });
-  });
-  
-  container.querySelectorAll('.draw-btn').forEach(btn => {
+
+  html += `</div>`;
+  container.innerHTML = html;
+
+  container.querySelectorAll('.filter-bar button[data-phase]').forEach(btn => {
     btn.addEventListener('click', e => {
-      const matchId = parseInt(e.target.dataset.matchId);
-      const winner = e.target.dataset.winner;
-      
-      state.matches[matchId].winnerOverride = winner;
-      
-      recalculateTournament();
-      calculateProdeStats();
+      state.filters.calendarPhase = e.target.dataset.phase;
       saveState();
-      renderIngreso();
+      renderCalendario();
     });
   });
+
+  const favBtn = container.querySelector('#calFavsBtn');
+  if (favBtn) {
+    favBtn.addEventListener('click', () => {
+      state.filters.calendarFavoritesOnly = !state.filters.calendarFavoritesOnly;
+      saveState();
+      renderCalendario();
+    });
+  }
+
+  const teamSelect = container.querySelector('#calTeamSelect');
+  if (teamSelect) {
+    teamSelect.addEventListener('change', e => {
+      state.filters.calendarTeam = e.target.value;
+      saveState();
+      renderCalendario();
+    });
+  }
+
+  const resetBtn = container.querySelector('#calResetBtn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      state.filters.calendarPhase = 'all';
+      state.filters.calendarTeam = 'all';
+      state.filters.calendarFavoritesOnly = false;
+      saveState();
+      renderCalendario();
+    });
+  }
+
+  container.querySelectorAll('.cal-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const matchId = parseInt(row.dataset.matchId);
+      openMatchModal(matchId);
+    });
+  });
+}
+
+function getProdeMatchClass(matchId) {
+  const pred = state.matches[matchId];
+  const real = state.realScores[matchId];
+  if (!real || !real.played || !pred) return '';
+  if (pred.homeScore === null || pred.awayScore === null) return '';
+  
+  const phs = parseInt(pred.homeScore);
+  const pas = parseInt(pred.awayScore);
+  const rhs = parseInt(real.homeScore);
+  const ras = parseInt(real.awayScore);
+  
+  if (phs === rhs && pas === ras) {
+    return 'match-card-exact';
+  }
+  
+  const predDiff = phs - pas;
+  const realDiff = rhs - ras;
+  if ((predDiff > 0 && realDiff > 0) || (predDiff < 0 && realDiff < 0) || (predDiff === 0 && realDiff === 0)) {
+    return 'match-card-outcome';
+  }
+  
+  return 'match-card-fail';
 }
 
 function renderGrupos() {
@@ -961,73 +901,133 @@ function renderGrupos() {
   if (!container) return;
   
   const groups = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+  const currentFilter = state.filters.selectedGroup || 'all';
+  
+  // Render Filter Bar
+  let filterBarHtml = `
+    <div class="filter-bar">
+      <button class="f-btn all-btn ${currentFilter === 'all' ? 'active' : ''}" data-g="all">Todos</button>
+      <button class="f-btn favs-btn ${currentFilter === 'favorites' ? 'active' : ''}" data-g="favorites">⭐ Favoritos</button>
+      ${groups.map(g => `
+        <button class="f-btn ${currentFilter === g ? 'active' : ''}" data-g="${g}">${g}</button>
+      `).join('')}
+      <button class="reset-btn" id="groupsResetBtn">Borrar todo</button>
+    </div>
+  `;
+  
   let html = `
     <div class="header-row">
       <h2>Fase de Grupos</h2>
-      <p>Consultá las tablas de posiciones y partidos de cada grupo del mundial.</p>
+      <p>Copa Mundial FIFA 2026™ · 11–27 junio · 12 grupos · 48 selecciones — Haz clic en un partido para ingresar el resultado</p>
     </div>
-    <div class="groups-grid">
+    
+    ${filterBarHtml}
+    
+    <div class="groups-grid ${currentFilter !== 'all' ? 'single' : ''}">
   `;
   
-  groups.forEach(gLetter => {
+  const filteredGroups = currentFilter === 'all'
+    ? groups
+    : currentFilter === 'favorites'
+      ? groups.filter(gLetter => {
+          const teams = groupTeams[gLetter] || [];
+          return teams.some(t => state.favorites.includes(t.toUpperCase()));
+        })
+      : [currentFilter];
+      
+  if (filteredGroups.length === 0 && currentFilter === 'favorites') {
+    html += `
+      <div class="empty-favorites" style="grid-column: 1 / -1; text-align: center; padding: 60px 40px; color: var(--text2);">
+        <p style="font-size: 16px; margin-bottom: 10px; font-weight: 600;">⭐ No tenés selecciones favoritas marcadas.</p>
+        <p style="font-size: 13px;">Hacé clic en el nombre de cualquier país (ej. en las tablas o selecciones) para abrir su ficha y marcarlo como favorito.</p>
+      </div>
+    `;
+  }
+  
+  filteredGroups.forEach(gLetter => {
     const standings = state.groupStandings[gLetter] || [];
     const groupMatches = rawMatches.filter(m => m.group === `Grupo ${gLetter}`);
     
+    // Count played matches
+    let playedCount = 0;
+    groupMatches.forEach(m => {
+      const pred = state.matches[m.id];
+      if (pred && pred.homeScore !== null && pred.awayScore !== null) {
+        playedCount++;
+      }
+    });
+    
     html += `
-      <div class="group-card glass">
-        <h3>Grupo ${gLetter}</h3>
+      <div class="g-card">
+        <div class="g-card-head">
+          <span class="g-title">Grupo ${gLetter}</span>
+          <span class="g-meta">${playedCount}/6 jugados</span>
+        </div>
         
-        <table class="standings-table">
-          <thead>
-            <tr>
-              <th>Pos</th>
-              <th class="team-th">Equipo</th>
-              <th>PJ</th>
-              <th>GF</th>
-              <th>GC</th>
-              <th>DG</th>
-              <th>Pts</th>
-            </tr>
-          </thead>
-          <tbody>
+        <div class="st-head">
+          <div></div><div>Equipo</div>
+          <div>PJ</div><div>G</div><div>E</div><div>P</div>
+          <div>GF:GA</div><div>Pts</div>
+        </div>
     `;
     
     standings.forEach((t, idx) => {
-      let rankClass = '';
-      if (idx < 2) rankClass = 'rank-qualified'; // Top 2
-      else if (idx === 2) rankClass = 'rank-third'; // 3rd place candidate
+      const isHost = t.name === 'MÉXICO' || t.name === 'CANADÁ' || t.name === 'ESTADOS UNIDOS';
+      const qc = idx === 0 ? 'q1' : idx === 1 ? 'q2' : idx === 2 ? 'q3' : 'q4';
+      const flag = teamFlags[t.name.toUpperCase()] || '🏳️';
+      const isFav = state.favorites.includes(t.name.toUpperCase());
+      const favStar = isFav ? '<span class="fav-star">★</span>' : '';
       
       html += `
-        <tr class="${rankClass}">
-          <td class="pos-col">${idx + 1}</td>
-          <td class="team-name-col">${getTeamDisplayName(t.name)}</td>
-          <td>${t.pj}</td>
-          <td>${t.gf}</td>
-          <td>${t.gc}</td>
-          <td>${t.dg >= 0 ? '+' + t.dg : t.dg}</td>
-          <td class="pts-col">${t.pts}</td>
-        </tr>
+        <div class="st-row ${qc}">
+          <div class="s-pos">${idx + 1}</div>
+          <div class="s-team">
+            <span class="s-flag">${flag}</span>
+            <span class="s-name" onclick="event.stopPropagation(); window.openSquadModal('${t.name.toUpperCase()}')" style="cursor: pointer;" title="Ver plantel">${t.name} ${favStar}</span>
+            ${isHost ? '<span class="s-host">Local</span>' : ''}
+          </div>
+          <div class="s-stat">${t.pj}</div>
+          <div class="s-stat">${t.pg}</div>
+          <div class="s-stat">${t.pe}</div>
+          <div class="s-stat">${t.pp}</div>
+          <div class="s-stat gfga">${t.pj > 0 ? t.gf + ':' + t.gc : '—'}</div>
+          <div class="s-stat pts">${t.pts}</div>
+        </div>
       `;
     });
     
     html += `
-          </tbody>
-        </table>
-        
-        <div class="group-matches-list">
-          <h4>Partidos</h4>
+        <div class="m-section">
+          <div class="m-label">Partidos</div>
     `;
     
     groupMatches.forEach(m => {
       const pred = state.matches[m.id];
-      const hs = pred.homeScore !== null && pred.homeScore !== '' ? pred.homeScore : '-';
-      const as = pred.awayScore !== null && pred.awayScore !== '' ? pred.awayScore : '-';
+      const played = pred && pred.homeScore !== null && pred.awayScore !== null;
+      const t1Flag = teamFlags[m.team1.toUpperCase()] || '🏳️';
+      const t2Flag = teamFlags[m.team2.toUpperCase()] || '🏳️';
       
+      const isHomeFav = state.favorites.includes(m.team1.toUpperCase());
+      const isAwayFav = state.favorites.includes(m.team2.toUpperCase());
+      const homeStar = isHomeFav ? '<span class="fav-star">★</span>' : '';
+      const awayStar = isAwayFav ? '<span class="fav-star">★</span>' : '';
+      const prodeCls = getProdeMatchClass(m.id);
+      
+      const sc = played
+        ? `<span class="sv">${pred.homeScore}</span><span class="ss"> – </span><span class="sv">${pred.awayScore}</span>`
+        : `<span class="sv">VS</span>`;
+        
       html += `
-        <div class="group-match-row">
-          <span class="gm-team">${getTeamDisplayName(m.team1)}</span>
-          <span class="gm-score">${hs} - ${as}</span>
-          <span class="gm-team">${getTeamDisplayName(m.team2)}</span>
+        <div class="m-row ${prodeCls}" data-match-id="${m.id}">
+          <div class="m-team home">
+            <span class="m-name">${m.team1} ${homeStar}</span>
+            <span class="m-flag">${t1Flag}</span>
+          </div>
+          <div class="m-score ${played ? 'done' : 'pending'}">${sc}</div>
+          <div class="m-team away">
+            <span class="m-flag">${t2Flag}</span>
+            <span class="m-name">${m.team2} ${awayStar}</span>
+          </div>
         </div>
       `;
     });
@@ -1038,21 +1038,55 @@ function renderGrupos() {
     `;
   });
   
-  html += `</div>`;
+  html += `
+    </div>
+    <div class="legend">
+      <div class="leg-item"><div class="leg-dot green"></div>Clasificado directo (1° y 2°)</div>
+      <div class="leg-item"><div class="leg-dot gold"></div>Posible mejor 3° (8 avanzan)</div>
+    </div>
+  `;
+  
   container.innerHTML = html;
+  
+  // Bind events
+  container.querySelectorAll('.f-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      state.filters.selectedGroup = e.target.dataset.g;
+      saveState();
+      renderGrupos();
+    });
+  });
+  
+  const resetBtn = container.querySelector('#groupsResetBtn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (confirm('¿Borrar todos los resultados del simulador?')) {
+        Object.keys(state.matches).forEach(mId => {
+          state.matches[mId] = { homeScore: null, awayScore: null, winnerOverride: null };
+        });
+        recalculateTournament();
+        calculateProdeStats();
+        saveState();
+        renderActiveTab();
+      }
+    });
+  }
+  
+  container.querySelectorAll('.m-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const matchId = parseInt(row.dataset.matchId);
+      openMatchModal(matchId);
+    });
+  });
 }
 
 function renderFaseFinal() {
   const container = document.getElementById('fase-final-view');
   if (!container) return;
   
-  let html = `
-    <div class="header-row">
-      <h2>Llaves y Fase Final</h2>
-      <p>Visualizá la tabla de mejores terceros y el desarrollo del bracket de eliminación directa.</p>
-    </div>
-    
-    <div class="best-thirds-section glass">
+  // Best Thirds Table
+  let thirdsHtml = `
+    <div class="best-thirds-section">
       <h3>Tabla de Mejores Terceros</h3>
       <table class="thirds-table">
         <thead>
@@ -1072,109 +1106,490 @@ function renderFaseFinal() {
   `;
   
   state.bestThirds.forEach(t => {
-    html += `
+    const flag = teamFlags[t.name.toUpperCase()] || '🏳️';
+    thirdsHtml += `
       <tr class="${t.qualified ? 'third-ok' : 'third-eliminated'}">
-          <td>${t.rank}</td>
-          <td>Grupo ${t.group}</td>
-          <td class="team-th">${getTeamDisplayName(t.name)}</td>
-          <td>${t.pj}</td>
-          <td>${t.gf}</td>
-          <td>${t.gc}</td>
-          <td>${t.dg >= 0 ? '+' + t.dg : t.dg}</td>
-          <td class="pts-col">${t.pts}</td>
-          <td><span class="badge">${t.qualified ? 'Clasificado' : 'Eliminado'}</span></td>
-        </tr>
+        <td>${t.rank}</td>
+        <td>Grupo ${t.group}</td>
+        <td class="team-th">${flag} ${t.name}</td>
+        <td>${t.pj}</td>
+        <td>${t.gf}</td>
+        <td>${t.gc}</td>
+        <td>${t.dg >= 0 ? '+' + t.dg : t.dg}</td>
+        <td class="pts-col">${t.pts}</td>
+        <td><span class="badge">${t.qualified ? 'Clasificado' : 'Eliminado'}</span></td>
+      </tr>
     `;
   });
   
-  html += `
+  thirdsHtml += `
         </tbody>
       </table>
     </div>
-    
-    <div class="bracket-wrapper">
-      <h3>Bracket de Fase de Eliminación Directa</h3>
-      <div class="bracket-grid">
   `;
   
-  // Render Brackets Column by Column
-  const stages = [
-    { title: 'Dieciseisavos de Final', matches: [73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88] },
-    { title: 'Octavos de Final', matches: [89, 90, 91, 92, 93, 94, 95, 96] },
-    { title: 'Cuartos de Final', matches: [97, 98, 99, 100] },
-    { title: 'Semifinales', matches: [101, 102] },
-    { title: 'Final y 3º Puesto', matches: [104, 103] }
+  // Symmetrical Bracket Render
+  const columns = [
+    { title: 'Ronda de 32', matches: [73, 75, 74, 77, 76, 78, 79, 80], extraClass: '' },
+    { title: 'Octavos', matches: [89, 90, 91, 92], extraClass: '' },
+    { title: 'Cuartos', matches: [97, 99], extraClass: '' },
+    { title: 'Semis', matches: [101], extraClass: '' },
+    { title: '★ Final', matches: [104], extraClass: ' fc' },
+    { title: 'Semis', matches: [102], extraClass: '' },
+    { title: 'Cuartos', matches: [98, 100], extraClass: '' },
+    { title: 'Octavos', matches: [93, 94, 95, 96], extraClass: '' },
+    { title: 'Ronda de 32', matches: [83, 84, 81, 82, 86, 88, 85, 87], extraClass: '' }
   ];
   
-  stages.forEach(stage => {
-    html += `
-      <div class="bracket-col">
-        <h4 class="bracket-stage-title">${stage.title}</h4>
-        <div class="bracket-matches">
-    `;
-    
-    stage.matches.forEach(mId => {
-      const rm = state.resolvedKnockoutMatches[mId];
-      const pred = state.matches[mId];
-      const dt = formatMatchDateTime(rawMatches.find(m => m.id === mId).dateStr, rawMatches.find(m => m.id === mId).timeStr);
-      
-      const t1 = rm ? rm.team1 : `Ganador ${mId}`;
-      const t2 = rm ? rm.team2 : `Ganador ${mId}`;
-      
-      const hs = pred.homeScore !== null && pred.homeScore !== '' ? pred.homeScore : '-';
-      const as = pred.awayScore !== null && pred.awayScore !== '' ? pred.awayScore : '-';
-      
-      const isFinal = mId === 104;
-      const isThirdPlace = mId === 103;
-      
-      let titleLabel = `Partido #${mId}`;
-      if (isFinal) titleLabel = '★ GRAN FINAL ★';
-      if (isThirdPlace) titleLabel = 'Tercer Puesto';
-      
-      const t1WinnerClass = (rm && rm.winner && rm.winner === t1) ? 'bracket-winner' : '';
-      const t2WinnerClass = (rm && rm.winner && rm.winner === t2) ? 'bracket-winner' : '';
-      
-      html += `
-        <div class="bracket-match-card glass">
-          <div class="bm-title">${titleLabel}</div>
-          <div class="bm-meta">${dt.date} - ${dt.time}hs</div>
-          
-          <div class="bm-team-row ${t1WinnerClass}">
-            <span class="bm-team-name">${getTeamDisplayName(t1)}</span>
-            <span class="bm-team-score">${hs}</span>
-          </div>
-          <div class="bm-team-row ${t2WinnerClass}">
-            <span class="bm-team-name">${getTeamDisplayName(t2)}</span>
-            <span class="bm-team-score">${as}</span>
-          </div>
-      `;
-      
-      // If draw resolution is needed and we are in bracket tab, allow resolving it here too!
-      if (rm && rm.isTied) {
-        html += `
-          <div class="bm-resolver">
-            <button class="bm-res-btn" onclick="resolveBracketTie(${mId}, '${t1}')">🏆 ${getTeamFlagAndName(t1)}</button>
-            <button class="bm-res-btn" onclick="resolveBracketTie(${mId}, '${t2}')">🏆 ${getTeamFlagAndName(t2)}</button>
-          </div>
-        `;
+  const getBracketRowHtml = (mId, side, team, score, oppositeScore) => {
+    const hasPlayed = score !== null && oppositeScore !== null;
+    let cls = '';
+    if (hasPlayed) {
+      if (score > oppositeScore) cls = ' winner';
+      else if (score < oppositeScore) cls = ' loser';
+      else {
+        // It was a draw, check who won by shootout
+        const rm = state.resolvedKnockoutMatches[mId];
+        if (rm && rm.winner === team) cls = ' winner';
+        else cls = ' loser';
       }
-      
-      html += `</div>`;
-    });
+    }
     
-    html += `</div></div>`;
-  });
+    const sc = score !== null ? `<span class="br-score">${score}</span>` : '';
+    
+    if (!team || team.startsWith('Falta') || team.startsWith('3º')) {
+      const sl = mId <= 88 ? getSeedLabel(mId, side) : '';
+      return `<div class="br-row tbd${cls}">${sl ? `<span class="br-seed">${sl}</span>` : ''}<span class="br-name">Por definir</span>${sc}</div>`;
+    }
+    
+    const flag = teamFlags[team.toUpperCase()] || '🏳️';
+    const isFav = state.favorites.includes(team.toUpperCase());
+    const favStar = isFav ? '<span class="fav-star">★</span>' : '';
+    return `<div class="br-row${cls}"><span class="br-flag">${flag}</span><span class="br-name" onclick="event.stopPropagation(); window.openSquadModal('${team.toUpperCase()}')" style="cursor: pointer;" title="Ver plantel">${team} ${favStar}</span>${sc}</div>`;
+  };
   
-  html += `</div></div>`;
-  container.innerHTML = html;
+  const getSeedLabel = (matchId, side) => {
+    const seeds = {
+      73: ['2°A', '2°B'], 74: ['1°C', '2°F'], 75: ['1°E', '3°E/F/G/H'], 76: ['1°F', '2°C'],
+      77: ['2°E', '2°I'], 78: ['1°I', '3°G/H/I/J'], 79: ['1°A', '3°A/B/C/D'], 80: ['1°L', '3°K/L'],
+      81: ['1°G', '3°H/I/J/K'], 82: ['1°D', '3°D/E/F/G'], 83: ['1°H', '2°J'], 84: ['2°K', '2°L'],
+      85: ['1°B', '3°B/C/D/E'], 86: ['2°D', '2°G'], 87: ['1°J', '2°H'], 88: ['1°K', '3°J/K/L']
+    };
+    if (seeds[matchId]) {
+      return side === 1 ? seeds[matchId][0] : seeds[matchId][1];
+    }
+    return '';
+  };
+  
+  const renderBracketMatch = (mId) => {
+    const rm = state.resolvedKnockoutMatches[mId];
+    const pred = state.matches[mId] || { homeScore: null, awayScore: null, winnerOverride: null };
+    
+    const t1 = rm ? rm.team1 : null;
+    const t2 = rm ? rm.team2 : null;
+    
+    const sA = pred.homeScore;
+    const sB = pred.awayScore;
+    
+    const isFinal = mId === 104;
+    const played = sA !== null && sB !== null;
+    const prodeCls = getProdeMatchClass(mId);
+    
+    return `
+      <div class="br-match ${played ? 'played' : ''} ${isFinal && played ? 'final-played' : ''} ${prodeCls}" data-match-id="${mId}">
+        ${getBracketRowHtml(mId, 1, t1, sA, sB)}
+        ${getBracketRowHtml(mId, 2, t2, sB, sA)}
+      </div>
+    `;
+  };
+  
+  let bracketColsHtml = columns.map(col => `
+    <div class="br-col${col.extraClass}">
+      <div class="br-col-hd">${col.title}</div>
+      <div class="br-matches">
+        ${col.matches.map(renderBracketMatch).join('')}
+      </div>
+    </div>
+  `).join('');
+  
+  // Render Third Place block
+  const thirdMatchId = 103;
+  const tm = state.resolvedKnockoutMatches[thirdMatchId];
+  const tpScore = state.matches[thirdMatchId] || { homeScore: null, awayScore: null, winnerOverride: null };
+  const tPlay = tpScore.homeScore !== null && tpScore.awayScore !== null;
+  const thirdMatchHtml = `
+    <div class="br-match ${tPlay ? 'played' : ''}" data-match-id="${thirdMatchId}" style="width: 200px; height: 74px; cursor: pointer;">
+      ${getBracketRowHtml(thirdMatchId, 1, tm ? tm.team1 : null, tpScore.homeScore, tpScore.awayScore)}
+      ${getBracketRowHtml(thirdMatchId, 2, tm ? tm.team2 : null, tpScore.awayScore, tpScore.homeScore)}
+    </div>
+  `;
+  
+  // Champion block
+  const finalMatch = state.resolvedKnockoutMatches[104];
+  const finalScore = state.matches[104] || { homeScore: null, awayScore: null, winnerOverride: null };
+  const hasChampion = finalMatch && finalMatch.winner;
+  
+  let champBlockHtml = `
+    <div class="champ-block ${hasChampion ? 'show' : ''}" id="champBlock">
+      <div class="champ-lbl">🏆 Campeón del Mundo 2026</div>
+      <div class="champ-team" id="champTeam">
+        ${hasChampion ? `<span class="champ-flag">${teamFlags[finalMatch.winner.toUpperCase()] || '🏳️'}</span><span>${finalMatch.winner}</span>` : ''}
+      </div>
+    </div>
+  `;
+  
+  container.innerHTML = `
+    <div class="page-hd">
+      <h1>Fase <strong>Final</strong></h1>
+      <p>Copa Mundial FIFA 2026™ · Los clasificados se auto-completan desde la Fase de Grupos · Haz clic en un partido para ingresar resultado</p>
+    </div>
+    
+    ${thirdsHtml}
+    
+    <div class="bracket-outer">
+      <div class="bracket-wrap" id="bracket">
+        ${bracketColsHtml}
+      </div>
+    </div>
+    
+    <div class="bottom-section">
+      <div class="third-block">
+        <div class="section-lbl">Tercer Lugar</div>
+        <div id="thirdMatch">
+          ${thirdMatchHtml}
+        </div>
+      </div>
+      ${champBlockHtml}
+    </div>
+  `;
+  
+  // Bind click listeners on all match cards
+  container.querySelectorAll('.br-match').forEach(card => {
+    card.addEventListener('click', () => {
+      const matchId = parseInt(card.dataset.matchId);
+      openMatchModal(matchId);
+    });
+  });
 }
 
-// Window level helper to resolve ties from bracket clicks
-window.resolveBracketTie = function(matchId, winnerName) {
-  state.matches[matchId].winnerOverride = winnerName;
+// --- RESULTS MODAL SYSTEM ---
+let currentEditingMatchId = null;
+let tempWinnerOverride = null;
+
+export function openMatchModal(matchId) {
+  currentEditingMatchId = matchId;
+  tempWinnerOverride = null;
+  
+  const m = rawMatches.find(x => x.id === matchId);
+  if (!m) return;
+  
+  const isKnockout = matchId >= 73 && matchId <= 104;
+  
+  // Resolve team names
+  let t1Name = m.team1;
+  let t2Name = m.team2;
+  
+  if (isKnockout) {
+    const resolved = state.resolvedKnockoutMatches[matchId];
+    if (resolved) {
+      t1Name = resolved.team1 || `Por definir (G${matchId})`;
+      t2Name = resolved.team2 || `Por definir (G${matchId})`;
+    }
+  }
+  
+  const t1Flag = teamFlags[t1Name.toUpperCase()] || '🏳️';
+  const t2Flag = teamFlags[t2Name.toUpperCase()] || '🏳️';
+  
+  const pred = state.matches[matchId] || { homeScore: null, awayScore: null, winnerOverride: null };
+  tempWinnerOverride = pred.winnerOverride;
+  
+  const moOverlay = document.getElementById('moOverlay');
+  const moTag = document.getElementById('moTag');
+  const moTitle = document.getElementById('moTitle');
+  const moFlagA = document.getElementById('moFlagA');
+  const moNameA = document.getElementById('moNameA');
+  const moFlagB = document.getElementById('moFlagB');
+  const moNameB = document.getElementById('moNameB');
+  const scA = document.getElementById('scA');
+  const scB = document.getElementById('scB');
+  
+  moTag.textContent = isKnockout ? (m.group || 'Fase Final') : m.group;
+  moTitle.textContent = `${t1Name} vs ${t2Name}`;
+  moFlagA.textContent = t1Flag;
+  moNameA.textContent = t1Name;
+  moFlagB.textContent = t2Flag;
+  moNameB.textContent = t2Name;
+  
+  scA.value = pred.homeScore !== null ? pred.homeScore : '';
+  scB.value = pred.awayScore !== null ? pred.awayScore : '';
+  
+  // Predict match probabilities and score
+  const predInfo = predictMatch(t1Name, t2Name);
+  const hasPred = predInfo && predInfo.score1 !== '-';
+  const real = state.realScores[matchId];
+  
+  const moPrediction = document.getElementById('moPrediction');
+  if (hasPred && (!real || !real.played)) {
+    moPrediction.style.display = 'block';
+    moPrediction.innerHTML = `
+      <div class="predictions-header">
+        <span class="pred-title">Predicción (Historial & Elo)</span>
+        <span class="pred-score">Sugerido: <strong>${predInfo.score1} - ${predInfo.score2}</strong></span>
+      </div>
+      
+      <div class="prob-bar-container">
+        <div class="prob-segment win1-seg" style="width: ${predInfo.win1}%" title="Ganará ${t1Name}: ${predInfo.win1}%">
+          <span class="prob-val">${predInfo.win1}%</span>
+        </div>
+        <div class="prob-segment draw-seg" style="width: ${predInfo.draw}%" title="Empate: ${predInfo.draw}%">
+          <span class="prob-val">${predInfo.draw}%</span>
+        </div>
+        <div class="prob-segment win2-seg" style="width: ${predInfo.win2}%" title="Ganará ${t2Name}: ${predInfo.win2}%">
+          <span class="prob-val">${predInfo.win2}%</span>
+        </div>
+      </div>
+      
+      <div class="rachas-row">
+        <div class="team-racha">
+          <span class="racha-label">Racha:</span>
+          ${formatRachaHTML(predInfo.racha1)}
+        </div>
+        <div class="team-racha">
+          <span class="racha-label">Racha:</span>
+          ${formatRachaHTML(predInfo.racha2)}
+        </div>
+      </div>
+    `;
+  } else {
+    moPrediction.style.display = 'none';
+  }
+  
+  // Render Prode
+  updateProdeUI(matchId);
+  
+  // Tie-breaker resolution box visibility check
+  updateTieResolutionUI(matchId, t1Name, t2Name);
+  
+  moOverlay.classList.add('open');
+  setTimeout(() => scA.focus(), 150);
+}
+
+function updateProdeUI(matchId) {
+  const moRealScore = document.getElementById('moRealScore');
+  const real = state.realScores[matchId];
+  if (!real || !real.played) {
+    moRealScore.style.display = 'none';
+    return;
+  }
+  
+  const rhs = parseInt(real.homeScore);
+  const ras = parseInt(real.awayScore);
+  
+  const valA = document.getElementById('scA').value;
+  const valB = document.getElementById('scB').value;
+  
+  let pointsLabel = '0 pts';
+  let badgeClass = 'prode-fail';
+  
+  if (valA !== '' && valB !== '') {
+    const phs = parseInt(valA);
+    const pas = parseInt(valB);
+    
+    if (phs === rhs && pas === ras) {
+      pointsLabel = '+3 pts (Exacto)';
+      badgeClass = 'prode-exact';
+    } else {
+      const predDiff = phs - pas;
+      const realDiff = rhs - ras;
+      if ((predDiff > 0 && realDiff > 0) || (predDiff < 0 && realDiff < 0) || (predDiff === 0 && realDiff === 0)) {
+        pointsLabel = '+1 pt (Acierto)';
+        badgeClass = 'prode-outcome';
+      }
+    }
+  }
+  
+  moRealScore.style.display = 'flex';
+  moRealScore.innerHTML = `
+    <span class="real-score-label">Resultado Real: <strong>${rhs} - ${ras}</strong></span>
+    <span class="prode-points-badge ${badgeClass}">${pointsLabel}</span>
+  `;
+}
+
+function updateTieResolutionUI(matchId, t1Name, t2Name) {
+  const isKnockout = matchId >= 73 && matchId <= 104;
+  const tieBox = document.getElementById('moTieResolution');
+  const winBtnA = document.getElementById('moWinnerBtnA');
+  const winBtnB = document.getElementById('moWinnerBtnB');
+  
+  if (!isKnockout) {
+    tieBox.style.display = 'none';
+    return;
+  }
+  
+  const valA = parseInt(document.getElementById('scA').value);
+  const valB = parseInt(document.getElementById('scB').value);
+  
+  if (!isNaN(valA) && !isNaN(valB) && valA === valB) {
+    tieBox.style.display = 'block';
+    winBtnA.innerHTML = `${teamFlags[t1Name.toUpperCase()] || '🏳️'} ${t1Name}`;
+    winBtnB.innerHTML = `${teamFlags[t2Name.toUpperCase()] || '🏳️'} ${t2Name}`;
+    
+    // Toggle active state
+    winBtnA.classList.toggle('selected', tempWinnerOverride === t1Name);
+    winBtnB.classList.toggle('selected', tempWinnerOverride === t2Name);
+  } else {
+    tieBox.style.display = 'none';
+  }
+}
+
+export function closeMatchModal() {
+  document.getElementById('moOverlay').classList.remove('open');
+  currentEditingMatchId = null;
+  tempWinnerOverride = null;
+}
+
+function saveMatchResult() {
+  if (!currentEditingMatchId) return;
+  const valA = document.getElementById('scA').value;
+  const valB = document.getElementById('scB').value;
+  
+  if (valA === '' || valB === '') {
+    alert('Ingresá el resultado de ambos equipos.');
+    return;
+  }
+  
+  const a = parseInt(valA);
+  const b = parseInt(valB);
+  
+  if (isNaN(a) || isNaN(b) || a < 0 || b < 0) {
+    alert('Ingresá un resultado válido.');
+    return;
+  }
+  
+  const isKnockout = currentEditingMatchId >= 73 && currentEditingMatchId <= 104;
+  if (isKnockout && a === b && !tempWinnerOverride) {
+    alert('Partido empatado en fase eliminatoria. Elegí el equipo que avanza antes de guardar.');
+    return;
+  }
+  
+  state.matches[currentEditingMatchId] = {
+    homeScore: a,
+    awayScore: b,
+    winnerOverride: isKnockout && a === b ? tempWinnerOverride : null
+  };
+  
   recalculateTournament();
+  calculateProdeStats();
   saveState();
-  renderFaseFinal();
+  closeMatchModal();
+  renderActiveTab();
+}
+
+function deleteMatchResult() {
+  if (!currentEditingMatchId) return;
+  
+  state.matches[currentEditingMatchId] = {
+    homeScore: null,
+    awayScore: null,
+    winnerOverride: null
+  };
+  
+  recalculateTournament();
+  calculateProdeStats();
+  saveState();
+  closeMatchModal();
+  renderActiveTab();
+}
+
+// --- SQUAD MODAL SYSTEM ---
+window.toggleFavorite = function(teamName) {
+  const cleanName = teamName.trim().toUpperCase();
+  const idx = state.favorites.indexOf(cleanName);
+  if (idx === -1) {
+    state.favorites.push(cleanName);
+  } else {
+    state.favorites.splice(idx, 1);
+  }
+  saveState();
+  renderActiveTab();
+};
+
+window.openSquadModal = function(teamName) {
+  const cleanName = teamName.trim().toUpperCase();
+  const det = teamDetails[cleanName];
+  if (!det) return;
+  
+  const ratingData = teamRatings[cleanName] || { initialRating: 'N/A', formCoefficient: 0, recentForm: [] };
+  const flag = teamFlags[cleanName] || '🏳️';
+  
+  const squadOverlay = document.getElementById('squadOverlay');
+  const squadTitle = document.getElementById('squadTitle');
+  const squadDetailsContent = document.getElementById('squadDetailsContent');
+  
+  const isFav = state.favorites.includes(cleanName);
+  const starChar = isFav ? '★' : '☆';
+  const starColor = isFav ? 'var(--gold)' : 'var(--text3)';
+  
+  squadTitle.innerHTML = `
+    ${flag} ${cleanName}
+    <button class="squad-fav-btn" onclick="event.stopPropagation(); window.toggleFavorite('${cleanName}'); window.openSquadModal('${cleanName}')" style="color: ${starColor}; border: none; background: none; font-size: 22px; cursor: pointer; vertical-align: middle; margin-left: 8px;" title="Marcar como favorito">
+      ${starChar}
+    </button>
+  `;
+  
+  squadDetailsContent.innerHTML = `
+    <div class="squad-meta-info">
+      <div class="squad-meta-item">
+        <span class="squad-meta-lbl">Director Técnico (DT)</span>
+        <span class="squad-meta-val text-cyan">${det.dt}</span>
+      </div>
+      <div class="squad-meta-item">
+        <span class="squad-meta-lbl">Jugador Figura</span>
+        <span class="squad-meta-val text-gold">${det.figura}</span>
+      </div>
+      <div class="squad-meta-item">
+        <span class="squad-meta-lbl">Mejor Historial</span>
+        <span class="squad-meta-val">${det.historial}</span>
+      </div>
+      <div class="squad-meta-item">
+        <span class="squad-meta-lbl">FIFA Elo Rating</span>
+        <span class="squad-meta-val">${ratingData.initialRating}</span>
+      </div>
+    </div>
+    
+    <div class="squad-grid">
+      <div class="squad-pos-section">
+        <h5>🧤 Arqueros</h5>
+        <ul>
+          ${det.arqueros.map(p => `<li>${p}</li>`).join('')}
+        </ul>
+      </div>
+      <div class="squad-pos-section">
+        <h5>🛡️ Defensores</h5>
+        <ul>
+          ${det.defensores.map(p => `<li>${p}</li>`).join('')}
+        </ul>
+      </div>
+      <div class="squad-pos-section">
+        <h5>⚙️ Mediocampistas</h5>
+        <ul>
+          ${det.mediocampistas.map(p => `<li>${p}</li>`).join('')}
+        </ul>
+      </div>
+      <div class="squad-pos-section">
+        <h5>⚽ Delanteros</h5>
+        <ul>
+          ${det.delanteros.map(p => `<li>${p}</li>`).join('')}
+        </ul>
+      </div>
+    </div>
+  `;
+  
+  squadOverlay.classList.add('open');
+};
+
+window.closeSquadModal = function() {
+  document.getElementById('squadOverlay').classList.remove('open');
 };
 
 // --- Debounce Helper for Text Input ---
@@ -1263,7 +1678,6 @@ export function calculateProdeStats() {
 
 // --- Fetch Real Scores from API with local Fallback ---
 export async function fetchRealScores() {
-  // 1. Initialize fallback scores first
   state.realScores = { ...fallbackRealScores };
   
   try {
@@ -1309,119 +1723,253 @@ export function initApp() {
     });
   });
   
+  // Set up modal listeners
+  document.getElementById('moSave').addEventListener('click', saveMatchResult);
+  document.getElementById('moDel').addEventListener('click', deleteMatchResult);
+  document.getElementById('moCancel').addEventListener('click', closeMatchModal);
+  document.getElementById('moOverlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('moOverlay')) closeMatchModal();
+  });
+  
+  document.getElementById('scA').addEventListener('input', () => {
+    if (currentEditingMatchId) {
+      const m = rawMatches.find(x => x.id === currentEditingMatchId);
+      let t1Name = m.team1;
+      let t2Name = m.team2;
+      if (currentEditingMatchId >= 73) {
+        const resolved = state.resolvedKnockoutMatches[currentEditingMatchId];
+        t1Name = resolved.team1 || 'Equipo A';
+        t2Name = resolved.team2 || 'Equipo B';
+      }
+      updateTieResolutionUI(currentEditingMatchId, t1Name, t2Name);
+      updateProdeUI(currentEditingMatchId);
+    }
+  });
+  document.getElementById('scB').addEventListener('input', () => {
+    if (currentEditingMatchId) {
+      const m = rawMatches.find(x => x.id === currentEditingMatchId);
+      let t1Name = m.team1;
+      let t2Name = m.team2;
+      if (currentEditingMatchId >= 73) {
+        const resolved = state.resolvedKnockoutMatches[currentEditingMatchId];
+        t1Name = resolved.team1 || 'Equipo A';
+        t2Name = resolved.team2 || 'Equipo B';
+      }
+      updateTieResolutionUI(currentEditingMatchId, t1Name, t2Name);
+      updateProdeUI(currentEditingMatchId);
+    }
+  });
+  
+  document.getElementById('moWinnerBtnA').addEventListener('click', () => {
+    if (currentEditingMatchId) {
+      const m = rawMatches.find(x => x.id === currentEditingMatchId);
+      let t1Name = m.team1;
+      if (currentEditingMatchId >= 73) {
+        const resolved = state.resolvedKnockoutMatches[currentEditingMatchId];
+        t1Name = resolved.team1 || 'Equipo A';
+      }
+      tempWinnerOverride = t1Name;
+      document.getElementById('moWinnerBtnA').classList.add('selected');
+      document.getElementById('moWinnerBtnB').classList.remove('selected');
+    }
+  });
+  document.getElementById('moWinnerBtnB').addEventListener('click', () => {
+    if (currentEditingMatchId) {
+      const m = rawMatches.find(x => x.id === currentEditingMatchId);
+      let t2Name = m.team2;
+      if (currentEditingMatchId >= 73) {
+        const resolved = state.resolvedKnockoutMatches[currentEditingMatchId];
+        t2Name = resolved.team2 || 'Equipo B';
+      }
+      tempWinnerOverride = t2Name;
+      document.getElementById('moWinnerBtnB').classList.add('selected');
+      document.getElementById('moWinnerBtnA').classList.remove('selected');
+    }
+  });
+  
+  // Squad modal listeners
+  document.getElementById('squadCancel').addEventListener('click', window.closeSquadModal);
+  document.getElementById('squadOverlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('squadOverlay')) window.closeSquadModal();
+  });
+  
+  // Set up header logo click to go back to portada
+  const brandLink = document.getElementById('brandLink');
+  if (brandLink) {
+    brandLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      state.activeTab = 'portada';
+      saveState();
+      renderActiveTab();
+    });
+  }
+  
   // Async fetch real world cup results
   fetchRealScores();
   
   renderActiveTab();
 }
 
-export function renderSelecciones() {
+function renderSelecciones() {
   const container = document.getElementById('selecciones-view');
   if (!container) return;
   
-  const teams = Object.keys(teamDetails).sort();
-  const selectedTeam = state.selectedTeamDetails || 'ARGENTINA';
-  const det = teamDetails[selectedTeam];
-  const ratingData = teamRatings[selectedTeam] || { initialRating: 'N/A', formCoefficient: 0, recentForm: [] };
+  const confColors = {
+    UEFA: '#3b82f6', CONMEBOL: '#f59e0b', CONCACAF: '#10b981',
+    CAF: '#ef4444', AFC: '#8b5cf6', OFC: '#64748b'
+  };
   
-  const flag = teamFlags[selectedTeam] || '🏳️';
+  const confLabels = {
+    UEFA: 'UEFA', CONMEBOL: 'CONMEBOL', CONCACAF: 'CONCACAF',
+    CAF: 'CAF (África)', AFC: 'AFC (Asia)', OFC: 'OFC (Oceanía)'
+  };
   
-  let squadHtml = '';
-  if (det) {
-    squadHtml = `
-      <div class="squad-sections-grid">
-        <div class="squad-pos-box glass-panel">
-          <h5>🧤 Arqueros</h5>
-          <ul>
-            ${det.arqueros.map(p => `<li>${p}</li>`).join('')}
-          </ul>
-        </div>
-        <div class="squad-pos-box glass-panel">
-          <h5>🛡️ Defensores</h5>
-          <ul>
-            ${det.defensores.map(p => `<li>${p}</li>`).join('')}
-          </ul>
-        </div>
-        <div class="squad-pos-box glass-panel">
-          <h5>⚙️ Mediocampistas</h5>
-          <ul>
-            ${det.mediocampistas.map(p => `<li>${p}</li>`).join('')}
-          </ul>
-        </div>
-        <div class="squad-pos-box glass-panel">
-          <h5>⚽ Delanteros</h5>
-          <ul>
-            ${det.delanteros.map(p => `<li>${p}</li>`).join('')}
-          </ul>
-        </div>
-      </div>
-    `;
-  }
+  const confs = ['UEFA', 'CONMEBOL', 'CONCACAF', 'CAF', 'AFC', 'OFC'];
+  const currentConf = state.filters.selectedConf || 'all';
   
-  container.innerHTML = `
-    <div class="header-row">
-      <h2>Fichas de Selecciones</h2>
-      <p>Conocé en detalle la plantilla convocada, el cuerpo técnico y la historia de los países participantes.</p>
-    </div>
-    
-    <div class="selecciones-control-bar glass">
-      <div class="team-selector-wrapper">
-        <label for="team-detail-select" class="filter-select-label">Seleccionar Selección:</label>
-        <select id="team-detail-select" class="glass-select">
-          ${teams.map(t => `
-            <option value="${t}" ${t === selectedTeam ? 'selected' : ''}>
-              ${getTeamFlagAndName(t)}
-            </option>
-          `).join('')}
-        </select>
-      </div>
-    </div>
-    
-    <div class="team-detail-card glass">
-      <div class="team-detail-header">
-        <span class="giant-flag">${flag}</span>
-        <div class="team-detail-title-block">
-          <h3>${selectedTeam}</h3>
-          <span class="team-detail-badge">FIFA Elo: <strong>${ratingData.initialRating}</strong></span>
-        </div>
-      </div>
-      
-      <div class="team-info-grid">
-        <div class="info-item">
-          <span class="info-item-lbl">Director Técnico (DT)</span>
-          <span class="info-item-val text-cyan">${det ? det.dt : 'Por definir'}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-item-lbl">Jugador Figura</span>
-          <span class="info-item-val text-gold">${det ? det.figura : 'Por definir'}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-item-lbl">Mejor Historial Mundial</span>
-          <span class="info-item-val">${det ? det.historial : 'N/A'}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-item-lbl">Racha Reciente</span>
-          <span class="info-item-val">${formatRachaHTML(ratingData.recentForm)}</span>
-        </div>
-      </div>
-      
-      <div class="squad-header">
-        <h4>Plantilla Oficial Convocada</h4>
-      </div>
-      
-      ${squadHtml}
+  // Compile all 48 teams
+  const allTeamsList = [];
+  Object.keys(groupTeams).forEach(gLetter => {
+    groupTeams[gLetter].forEach(team => {
+      const cleanTeam = team.trim().toUpperCase();
+      const conf = teamConfederations[cleanTeam] || 'UEFA';
+      const isHost = cleanTeam === 'MÉXICO' || cleanTeam === 'CANADÁ' || cleanTeam === 'ESTADOS UNIDOS';
+      allTeamsList.push({
+        name: team,
+        cleanName: cleanTeam,
+        group: gLetter,
+        conf,
+        isHost
+      });
+    });
+  });
+  
+  // Sort teams alphabetically
+  allTeamsList.sort((a, b) => a.name.localeCompare(b.name));
+  
+  const filteredTeams = currentConf === 'all' ? allTeamsList : allTeamsList.filter(t => t.conf === currentConf);
+  
+  // Filter Bar
+  const counts = { all: 48 };
+  confs.forEach(c => {
+    counts[c] = allTeamsList.filter(t => t.conf === c).length;
+  });
+  
+  let filterBarHtml = `
+    <div class="filter-bar">
+      <button class="f-btn ${currentConf === 'all' ? 'active' : ''}" data-c="all">
+        Todas <span class="f-count">${counts.all}</span>
+      </button>
+      ${confs.map(c => `
+        <button class="f-btn ${currentConf === c ? 'active' : ''}" data-c="${c}">
+          ${c} <span class="f-count">${counts[c]}</span>
+        </button>
+      `).join('')}
     </div>
   `;
   
-  // Bind selector event
-  const select = document.getElementById('team-detail-select');
-  if (select) {
-    select.addEventListener('change', e => {
-      state.selectedTeamDetails = e.target.value;
+  let contentHtml = '';
+  
+  const renderCard = (t) => {
+    const flag = teamFlags[t.cleanName] || '🏳️';
+    const pos = getTeamGroupPosition(t.name, t.group);
+    const cc = confColors[t.conf] || '#888';
+    
+    let posHtml = '';
+    let qualifiedClass = '';
+    
+    if (pos !== null) {
+      const pClass = (pos === 1 || pos === 2) ? 'p1' : pos === 3 ? 'p3' : 'p4';
+      posHtml = `<div class="tc-pos ${pClass}"><div class="tc-pos-dot"></div>${pos}° Grupo ${t.group}</div>`;
+      if (pos === 1 || pos === 2) qualifiedClass = ' qualified';
+    } else {
+      posHtml = `<div class="tc-pos"></div>`;
+    }
+    
+    const isFav = state.favorites.includes(t.cleanName);
+    const favStar = isFav ? '<span class="fav-star" style="margin-left: 4px;">★</span>' : '';
+    
+    return `
+      <div class="tc-card${qualifiedClass}" onclick="event.stopPropagation(); window.openSquadModal('${t.cleanName}')">
+        ${t.isHost ? '<span class="tc-host-badge">Local</span>' : ''}
+        <span class="tc-flag">${flag}</span>
+        <div class="tc-name">${t.name} ${favStar}</div>
+        <div class="tc-tags">
+          <span class="tc-group">Grupo ${t.group}</span>
+          <span class="tc-conf" style="color:${cc};background:${cc}1a;border:1px solid ${cc}40">${t.conf}</span>
+        </div>
+        ${posHtml}
+      </div>
+    `;
+  };
+  
+  if (currentConf !== 'all') {
+    // Single confederation grid
+    contentHtml = `
+      <div class="conf-header">
+        <span class="conf-title" style="color:${confColors[currentConf]}">${confLabels[currentConf]}</span>
+        <span class="conf-count">${filteredTeams.length} selecciones</span>
+      </div>
+      <div class="teams-grid">
+        ${filteredTeams.map(renderCard).join('')}
+      </div>
+    `;
+  } else {
+    // Grouped by confederation
+    contentHtml = confs.map(c => {
+      const confTeams = allTeamsList.filter(t => t.conf === c);
+      return `
+        <div class="conf-section">
+          <div class="conf-header">
+            <span class="conf-title" style="color:${confColors[c]}">${confLabels[c]}</span>
+            <span class="conf-count">${confTeams.length} selecciones</span>
+          </div>
+          <div class="teams-grid">
+            ${confTeams.map(renderCard).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+  
+  container.innerHTML = `
+    <div class="page-hd">
+      <h1>Selec<strong>ciones</strong></h1>
+      <p>Copa Mundial FIFA 2026™ · 48 selecciones clasificadas · 6 confederaciones · Haz clic en un país para ver su plantel</p>
+    </div>
+    
+    ${filterBarHtml}
+    
+    <div id="selecciones-content">
+      ${contentHtml}
+    </div>
+  `;
+  
+  // Bind filters
+  container.querySelectorAll('.f-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      state.filters.selectedConf = btn.dataset.c;
       saveState();
       renderSelecciones();
     });
-  }
+  });
+}
+
+function getTeamGroupPosition(teamName, groupLetter) {
+  const standings = state.groupStandings[groupLetter];
+  if (!standings) return null;
+  
+  // Check if any match in this group has been played
+  const groupMatches = rawMatches.filter(m => m.group === `Grupo ${groupLetter}`);
+  const hasPlayed = groupMatches.some(m => {
+    const pred = state.matches[m.id];
+    return pred && pred.homeScore !== null && pred.awayScore !== null;
+  });
+  
+  if (!hasPlayed) return null;
+  
+  const idx = standings.findIndex(t => t.name.toUpperCase() === teamName.toUpperCase());
+  return idx >= 0 ? idx + 1 : null;
 }
 
 // Initialize immediately (module scripts run after DOM is parsed)

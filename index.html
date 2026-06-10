@@ -1,35 +1,39 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simulador de Fixture Copa Mundial FIFA 2026™</title>
-  <!-- Google Fonts Outfit & Inter -->
+  <!-- Google Fonts Barlow Condensed & DM Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="/src/style.css">
 </head>
+
 <body>
   <div class="app-wrapper">
     <header class="app-header glass">
       <div class="header-main">
-        <div class="logo-area">
-          <span class="logo-emoji">🏆</span>
+        <a class="nav-brand" href="#" id="brandLink">
+          <span class="logo-emoji">⚽</span>
           <div class="logo-text">
-            <span class="logo-title">Mundial 2026</span>
-            <span class="logo-subtitle">Simulador</span>
+            <span class="logo-title">Mundial <em>2026</em></span>
           </div>
-        </div>
-        
+        </a>
+
         <nav class="app-nav">
+          <span class="nav-chip">Simulador</span>
           <button class="nav-btn active" data-tab="portada" id="nav-portada">Portada</button>
-          <button class="nav-btn" data-tab="ingreso" id="nav-ingreso">Ingreso</button>
+          <button class="nav-btn" data-tab="calendario" id="nav-calendario">Calendario</button>
           <button class="nav-btn" data-tab="grupos" id="nav-grupos">Grupos</button>
           <button class="nav-btn" data-tab="fase-final" id="nav-fase-final">Fase Final</button>
           <button class="nav-btn" data-tab="selecciones" id="nav-selecciones">Selecciones</button>
         </nav>
-        
+
         <div class="settings-area">
           <label for="timezone-select" class="tz-label">Zona Horaria:</label>
           <select id="timezone-select" class="tz-select glass-select">
@@ -42,17 +46,77 @@
     <main class="app-content">
       <!-- Tab Views -->
       <section id="portada-view" class="view-container active"></section>
-      <section id="ingreso-view" class="view-container"></section>
+      <section id="calendario-view" class="view-container"></section>
       <section id="grupos-view" class="view-container"></section>
       <section id="fase-final-view" class="view-container"></section>
       <section id="selecciones-view" class="view-container"></section>
     </main>
 
     <footer class="app-footer">
-      <p>© 2026 Mundial Fixture Simulator. Todos los derechos reservados. Basado en el modelo de Clases Excel.</p>
+      <p>Vibecodeado por Jaime </p>
     </footer>
+  </div>
+
+  <!-- MODAL DE RESULTADOS -->
+  <div class="mo-overlay" id="moOverlay">
+    <div class="modal">
+      <div class="mo-tag" id="moTag">Fase de Grupos</div>
+      <div class="mo-title" id="moTitle">Resultado del partido</div>
+      <div class="mo-teams">
+        <div class="mo-team">
+          <div class="mo-tflag" id="moFlagA"></div>
+          <div class="mo-tname" id="moNameA"></div>
+        </div>
+        <div class="mo-inputs">
+          <input class="sc-inp" id="scA" type="number" min="0" max="30" placeholder="0">
+          <span class="sc-sep">—</span>
+          <input class="sc-inp" id="scB" type="number" min="0" max="30" placeholder="0">
+        </div>
+        <div class="mo-team">
+          <div class="mo-tflag" id="moFlagB"></div>
+          <div class="mo-tname" id="moNameB"></div>
+        </div>
+      </div>
+
+      <!-- Predictor Widget -->
+      <div id="moPrediction" class="match-predictions" style="display: none; margin-top: 15px;"></div>
+
+      <!-- Real score comparison (Prode) -->
+      <div id="moRealScore" class="real-score-badge-row" style="display: none; margin-top: 12px;"></div>
+
+      <!-- Contenedor dinámico de desempate en playoffs -->
+      <div class="mo-note" id="moTieResolution" style="display: none; margin-bottom: 14px;">
+        <p style="color: var(--gold); font-weight: 600; margin-bottom: 6px;">Partido empatado. Seleccioná el equipo que
+          avanza:</p>
+        <div class="draw-btns" style="display: flex; gap: 8px; justify-content: center;">
+          <button class="draw-btn" id="moWinnerBtnA"></button>
+          <button class="draw-btn" id="moWinnerBtnB"></button>
+        </div>
+      </div>
+
+      <div class="mo-actions">
+        <button class="btn btn-primary" id="moSave">Guardar</button>
+        <button class="btn btn-del" id="moDel">Borrar</button>
+        <button class="btn btn-ghost" id="moCancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE DETALLE DE PLANTILLA DE SELECCIONES -->
+  <div class="mo-overlay" id="squadOverlay">
+    <div class="modal squad-modal" style="width: 500px; max-width: 92vw;">
+      <div class="mo-tag">Ficha de Selección</div>
+      <div class="mo-title" id="squadTitle">País</div>
+      <div class="squad-details-content" id="squadDetailsContent">
+        <!-- Contenido generado dinámicamente -->
+      </div>
+      <div class="mo-actions" style="margin-top: 20px;">
+        <button class="btn btn-ghost" id="squadCancel" style="flex: 1;">Cerrar</button>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/src/main.js"></script>
 </body>
+
 </html>
