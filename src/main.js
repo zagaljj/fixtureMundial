@@ -787,6 +787,12 @@ export function renderCalendario() {
         else if (m.id === 103) stageTag = 'Tercer Puesto';
         else if (m.id === 104) stageTag = 'Final';
 
+        const real = state.realScores[m.id];
+        const hasReal = real && real.played;
+        const realScoreHtml = hasReal
+          ? `<span class="m-real-score-badge">Real: ${real.homeScore}-${real.awayScore}</span>`
+          : '';
+
         html += `
           <div class="cal-row ${prodeCls}" data-match-id="${m.id}">
             <div class="cal-time-col">
@@ -801,7 +807,10 @@ export function renderCalendario() {
               <span class="cal-flag">${ti.t1Flag}</span>
             </div>
             
-            <div class="m-score ${played ? 'done' : 'pending'}">${sc}</div>
+            <div class="m-score-wrapper">
+              <div class="m-score ${played ? 'done' : 'pending'}">${sc}</div>
+              ${realScoreHtml}
+            </div>
             
             <div class="cal-team away ${ti.isUnresolved2 ? 'tbd' : ''}">
               <span class="cal-flag">${ti.t2Flag}</span>
@@ -1016,6 +1025,12 @@ function renderGrupos() {
       const sc = played
         ? `<span class="sv">${pred.homeScore}</span><span class="ss"> – </span><span class="sv">${pred.awayScore}</span>`
         : `<span class="sv">VS</span>`;
+      
+      const real = state.realScores[m.id];
+      const hasReal = real && real.played;
+      const realScoreHtml = hasReal
+        ? `<span class="m-real-score-badge">Real: ${real.homeScore}-${real.awayScore}</span>`
+        : '';
         
       html += `
         <div class="m-row ${prodeCls}" data-match-id="${m.id}">
@@ -1023,7 +1038,10 @@ function renderGrupos() {
             <span class="m-name">${m.team1} ${homeStar}</span>
             <span class="m-flag">${t1Flag}</span>
           </div>
-          <div class="m-score ${played ? 'done' : 'pending'}">${sc}</div>
+          <div class="m-score-wrapper">
+            <div class="m-score ${played ? 'done' : 'pending'}">${sc}</div>
+            ${realScoreHtml}
+          </div>
           <div class="m-team away">
             <span class="m-flag">${t2Flag}</span>
             <span class="m-name">${m.team2} ${awayStar}</span>

@@ -2174,3 +2174,33 @@ body {
     font-size: 14px;
   }
 }
+
+/* --- SCORES COMPARISON WRAPPER & BADGE --- */
+.m-score-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 100%;
+}
+
+.m-score-wrapper .m-score {
+  width: 100%;
+}
+
+.m-real-score-badge {
+  font-family: var(--fn);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text3);
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.m-row:hover .m-real-score-badge,
+.cal-row:hover .m-real-score-badge {
+  color: var(--text2);
+}
+
