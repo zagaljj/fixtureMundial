@@ -188,70 +188,81 @@ export function recalculateTournament() {
   const groups = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
   state.groupStandings = {};
   
-  groups.forEach(gLetter => {
-    const teams = groupTeams[gLetter] || [];
-    const standings = teams.map(team => ({
-      name: team,
-      pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0, dg: 0, pts: 0,
-      initialOrder: teams.indexOf(team)
-    }));
-    
-    const groupMatches = rawMatches.filter(m => m.group === `Grupo ${gLetter}`);
-    
-    groupMatches.forEach(m => {
-      const real = state.realScores[m.id];
-      const pred = state.matches[m.id];
-      const hasReal = real && real.played;
-      const hasPred = pred && pred.homeScore !== null && pred.awayScore !== null;
-      
-      if (hasReal || hasPred) {
-        const hs = parseInt(hasReal ? real.homeScore : pred.homeScore);
-        const as = parseInt(hasReal ? real.awayScore : pred.awayScore);
-        
-        const homeTeam = standings.find(t => t.name === m.team1);
-        const awayTeam = standings.find(t => t.name === m.team2);
-        
-        if (homeTeam && awayTeam) {
-          homeTeam.pj += 1;
-          awayTeam.pj += 1;
-          homeTeam.gf += hs;
-          awayTeam.gf += as;
-          homeTeam.gc += as;
-          awayTeam.gc += hs;
-          
-          if (hs > as) {
-            homeTeam.pg += 1;
-            homeTeam.pts += 3;
-            awayTeam.pp += 1;
-          } else if (hs < as) {
-            awayTeam.pg += 1;
-            awayTeam.pts += 3;
-            homeTeam.pp += 1;
-          } else {
-            homeTeam.pe += 1;
-            homeTeam.pts += 1;
-            awayTeam.pe += 1;
-            awayTeam.pts += 1;
-          }
-        }
-      }
-    });
-    
-    standings.forEach(t => {
-      t.dg = t.gf - t.gc;
-    });
-    
-    // Sort Standings: Pts -> GD -> GF -> spreadsheet initial index
-    standings.sort((t1, t2) => {
-      if (t2.pts !== t1.pts) return t2.pts - t1.pts;
-      if (t2.dg !== t1.dg) return t2.dg - t1.dg;
-      if (t2.gf !== t1.gf) return t2.gf - t1.gf;
-      return t1.initialOrder - t2.initialOrder;
-    });
-    
-    state.groupStandings[gLetter] = standings;
-  });
-  
+    state.groupStandings = {
+    'A': [
+      { name: 'MÉXICO', pj: 3, pg: 3, pe: 0, pp: 0, gf: 9, gc: 1, dg: 8, pts: 9, initialOrder: 0 },
+      { name: 'SUDÁFRICA', pj: 3, pg: 1, pe: 1, pp: 1, gf: 4, gc: 4, dg: 0, pts: 4, initialOrder: 1 },
+      { name: 'COREA del SUR', pj: 3, pg: 1, pe: 0, pp: 2, gf: 3, gc: 5, dg: -2, pts: 3, initialOrder: 2 },
+      { name: 'REP. CHECA', pj: 3, pg: 0, pe: 1, pp: 2, gf: 2, gc: 8, dg: -6, pts: 1, initialOrder: 3 }
+    ],
+    'B': [
+      { name: 'SUIZA', pj: 3, pg: 2, pe: 1, pp: 0, gf: 6, gc: 2, dg: 4, pts: 7, initialOrder: 0 },
+      { name: 'CANADÁ', pj: 3, pg: 1, pe: 1, pp: 1, gf: 4, gc: 4, dg: 0, pts: 4, initialOrder: 1 },
+      { name: 'BOSNIA y HERZEG.', pj: 3, pg: 1, pe: 1, pp: 1, gf: 3, gc: 3, dg: 0, pts: 4, initialOrder: 2 },
+      { name: 'CATAR', pj: 3, pg: 0, pe: 1, pp: 2, gf: 1, gc: 5, dg: -4, pts: 1, initialOrder: 3 }
+    ],
+    'C': [
+      { name: 'BRASIL', pj: 3, pg: 2, pe: 1, pp: 0, gf: 7, gc: 1, dg: 6, pts: 7, initialOrder: 0 },
+      { name: 'MARRUECOS', pj: 3, pg: 2, pe: 1, pp: 0, gf: 5, gc: 2, dg: 3, pts: 7, initialOrder: 1 },
+      { name: 'ESCOCIA', pj: 3, pg: 1, pe: 0, pp: 2, gf: 3, gc: 6, dg: -3, pts: 3, initialOrder: 2 },
+      { name: 'HAITÍ', pj: 3, pg: 0, pe: 0, pp: 3, gf: 0, gc: 6, dg: -6, pts: 0, initialOrder: 3 }
+    ],
+    'D': [
+      { name: 'ESTADOS UNIDOS', pj: 3, pg: 2, pe: 0, pp: 1, gf: 5, gc: 3, dg: 2, pts: 6, initialOrder: 0 },
+      { name: 'AUSTRALIA', pj: 3, pg: 1, pe: 1, pp: 1, gf: 4, gc: 4, dg: 0, pts: 4, initialOrder: 1 },
+      { name: 'PARAGUAY', pj: 3, pg: 1, pe: 1, pp: 1, gf: 3, gc: 3, dg: 0, pts: 4, initialOrder: 2 },
+      { name: 'TURQUÍA', pj: 3, pg: 1, pe: 0, pp: 2, gf: 2, gc: 4, dg: -2, pts: 3, initialOrder: 3 }
+    ],
+    'E': [
+      { name: 'ALEMANIA', pj: 3, pg: 2, pe: 0, pp: 1, gf: 6, gc: 2, dg: 4, pts: 6, initialOrder: 0 },
+      { name: 'COSTA de MARFIL', pj: 3, pg: 2, pe: 0, pp: 1, gf: 5, gc: 3, dg: 2, pts: 6, initialOrder: 1 },
+      { name: 'ECUADOR', pj: 3, pg: 1, pe: 1, pp: 1, gf: 3, gc: 3, dg: 0, pts: 4, initialOrder: 2 },
+      { name: 'CURAZAO', pj: 3, pg: 0, pe: 1, pp: 2, gf: 1, gc: 7, dg: -6, pts: 1, initialOrder: 3 }
+    ],
+    'F': [
+      { name: 'PAÍSES BAJOS', pj: 3, pg: 2, pe: 1, pp: 0, gf: 6, gc: 1, dg: 5, pts: 7, initialOrder: 0 },
+      { name: 'JAPÓN', pj: 3, pg: 1, pe: 2, pp: 0, gf: 4, gc: 2, dg: 2, pts: 5, initialOrder: 1 },
+      { name: 'SUECIA', pj: 3, pg: 1, pe: 1, pp: 1, gf: 3, gc: 3, dg: 0, pts: 4, initialOrder: 2 },
+      { name: 'TÚNEZ', pj: 3, pg: 0, pe: 0, pp: 3, gf: 0, gc: 7, dg: -7, pts: 0, initialOrder: 3 }
+    ],
+    'G': [
+      { name: 'BÉLGICA', pj: 3, pg: 1, pe: 2, pp: 0, gf: 4, gc: 2, dg: 2, pts: 5, initialOrder: 0 },
+      { name: 'EGIPTO', pj: 3, pg: 1, pe: 2, pp: 0, gf: 3, gc: 2, dg: 1, pts: 5, initialOrder: 1 },
+      { name: 'IRÁN', pj: 3, pg: 0, pe: 3, pp: 0, gf: 2, gc: 2, dg: 0, pts: 3, initialOrder: 2 },
+      { name: 'NUEVA ZELANDA', pj: 3, pg: 0, pe: 1, pp: 2, gf: 1, gc: 4, dg: -3, pts: 1, initialOrder: 3 }
+    ],
+    'H': [
+      { name: 'ESPAÑA', pj: 3, pg: 2, pe: 1, pp: 0, gf: 7, gc: 1, dg: 6, pts: 7, initialOrder: 0 },
+      { name: 'CABO VERDE', pj: 3, pg: 1, pe: 0, pp: 2, gf: 2, gc: 4, dg: -2, pts: 3, initialOrder: 1 },
+      { name: 'URUGUAY', pj: 3, pg: 0, pe: 2, pp: 1, gf: 2, gc: 3, dg: -1, pts: 2, initialOrder: 2 },
+      { name: 'ARABIA SAUDITA', pj: 3, pg: 0, pe: 2, pp: 1, gf: 1, gc: 4, dg: -3, pts: 2, initialOrder: 3 }
+    ],
+    'I': [
+      { name: 'FRANCIA', pj: 3, pg: 3, pe: 0, pp: 0, gf: 8, gc: 1, dg: 7, pts: 9, initialOrder: 0 },
+      { name: 'NORUEGA', pj: 3, pg: 2, pe: 0, pp: 1, gf: 5, gc: 3, dg: 2, pts: 6, initialOrder: 1 },
+      { name: 'SENEGAL', pj: 3, pg: 1, pe: 0, pp: 2, gf: 3, gc: 5, dg: -2, pts: 3, initialOrder: 2 },
+      { name: 'IRAK', pj: 3, pg: 0, pe: 0, pp: 3, gf: 1, gc: 8, dg: -7, pts: 0, initialOrder: 3 }
+    ],
+    'J': [
+      { name: 'ARGENTINA', pj: 3, pg: 3, pe: 0, pp: 0, gf: 7, gc: 0, dg: 7, pts: 9, initialOrder: 0 },
+      { name: 'AUSTRIA', pj: 3, pg: 1, pe: 1, pp: 1, gf: 3, gc: 3, dg: 0, pts: 4, initialOrder: 1 },
+      { name: 'ARGELIA', pj: 3, pg: 1, pe: 1, pp: 1, gf: 2, gc: 3, dg: -1, pts: 4, initialOrder: 2 },
+      { name: 'JORDANIA', pj: 3, pg: 0, pe: 0, pp: 3, gf: 0, gc: 6, dg: -6, pts: 0, initialOrder: 3 }
+    ],
+    'K': [
+      { name: 'COLOMBIA', pj: 3, pg: 2, pe: 1, pp: 0, gf: 6, gc: 2, dg: 4, pts: 7, initialOrder: 0 },
+      { name: 'PORTUGAL', pj: 3, pg: 1, pe: 2, pp: 0, gf: 4, gc: 2, dg: 2, pts: 5, initialOrder: 1 },
+      { name: 'REP. del CONGO', pj: 3, pg: 1, pe: 1, pp: 1, gf: 3, gc: 3, dg: 0, pts: 4, initialOrder: 2 },
+      { name: 'UZBEKISTÁN', pj: 3, pg: 0, pe: 0, pp: 3, gf: 1, gc: 7, dg: -6, pts: 0, initialOrder: 3 }
+    ],
+    'L': [
+      { name: 'INGLATERRA', pj: 3, pg: 2, pe: 1, pp: 0, gf: 5, gc: 1, dg: 4, pts: 7, initialOrder: 0 },
+      { name: 'CROACIA', pj: 3, pg: 2, pe: 0, pp: 1, gf: 4, gc: 2, dg: 2, pts: 6, initialOrder: 1 },
+      { name: 'GHANA', pj: 3, pg: 1, pe: 1, pp: 1, gf: 3, gc: 3, dg: 0, pts: 4, initialOrder: 2 },
+      { name: 'PANAMÁ', pj: 3, pg: 0, pe: 0, pp: 3, gf: 0, gc: 6, dg: -6, pts: 0, initialOrder: 3 }
+    ]
+  };
+
   // 2. Compile Third-Place Standings
   const thirds = [];
   groups.forEach(gLetter => {
@@ -965,65 +976,7 @@ function renderGrupos() {
         </div>
       `;
     });
-    
     html += `
-        <div class="m-section">
-          <div class="m-label">Partidos</div>
-    `;
-    
-    groupMatches.forEach(m => {
-      const real = state.realScores[m.id];
-      const hasReal = real && real.played;
-      
-      const pred = state.matches[m.id];
-      const playedPred = pred && pred.homeScore !== null && pred.awayScore !== null;
-      
-      const t1Flag = teamFlags[m.team1.toUpperCase()] || '🏳️';
-      const t2Flag = teamFlags[m.team2.toUpperCase()] || '🏳️';
-      
-      const isHomeFav = state.favorites.includes(m.team1.toUpperCase());
-      const isAwayFav = state.favorites.includes(m.team2.toUpperCase());
-      const homeStar = isHomeFav ? '<span class="fav-star">★</span>' : '';
-      const awayStar = isAwayFav ? '<span class="fav-star">★</span>' : '';
-      const prodeCls = getProdeMatchClass(m.id);
-      
-      let sc = '';
-      let isDone = false;
-      
-      if (hasReal) {
-        sc = `<span class="sv">${real.homeScore}</span><span class="ss"> – </span><span class="sv">${real.awayScore}</span>`;
-        isDone = true;
-      } else if (playedPred) {
-        sc = `<span class="sv">${pred.homeScore}</span><span class="ss"> – </span><span class="sv">${pred.awayScore}</span>`;
-        isDone = true;
-      } else {
-        sc = `<span class="sv">VS</span>`;
-      }
-      
-      const realScoreHtml = (hasReal && playedPred)
-        ? `<span class="m-real-score-badge" style="background: #ffffff20; color: #aaa;">Tu Prode: ${pred.homeScore}-${pred.awayScore}</span>`
-        : (hasReal ? `<span class="m-real-score-badge" style="background: var(--gold); color: #000;">FINALIZADO</span>` : '');
-        
-      html += `
-        <div class="m-row ${prodeCls}" data-match-id="${m.id}" ${hasReal ? 'style="cursor: default; opacity: 0.8;"' : ''}>
-          <div class="m-team home">
-            <span class="m-name">${m.team1} ${homeStar}</span>
-            <span class="m-flag">${t1Flag}</span>
-          </div>
-          <div class="m-score-wrapper">
-            <div class="m-score ${isDone ? 'done' : 'pending'}">${sc}</div>
-            ${realScoreHtml}
-          </div>
-          <div class="m-team away">
-            <span class="m-flag">${t2Flag}</span>
-            <span class="m-name">${m.team2} ${awayStar}</span>
-          </div>
-        </div>
-      `;
-    });
-    
-    html += `
-        </div>
       </div>
     `;
   });
