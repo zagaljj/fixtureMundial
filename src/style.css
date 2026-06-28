@@ -2204,3 +2204,55 @@ body {
   color: var(--text2);
 }
 
+/* --- Bracket Mobile Responsiveness --- */
+@media (max-width: 768px) {
+  .bracket-wrap {
+    gap: 4px;
+    padding: 0 10px;
+  }
+  
+  .br-col {
+    width: 140px; /* Reduced from 194px */
+  }
+  
+  .br-col.fc {
+    width: 150px;
+  }
+  
+  .br-match {
+    width: 136px !important; /* Reduced from 184px */
+    height: 58px !important; /* Reduced from 68px */
+    border-radius: 6px;
+  }
+  
+  .fc .br-match {
+    width: 146px !important; /* Reduced from 200px */
+    height: 64px !important;
+  }
+  
+  .br-row {
+    padding: 0 6px;
+  }
+  
+  .br-team {
+    font-size: 11px; /* Reduced from 12px */
+  }
+  
+  .br-flag {
+    font-size: 14px; /* Reduced from 16px */
+  }
+  
+  .br-score {
+    width: 20px; /* Reduced from 24px */
+    height: 20px;
+    font-size: 12px;
+  }
+  
+  .br-col-hd {
+    font-size: 9px; /* Reduced from 10px */
+    padding: 2px 6px;
+    margin-bottom: 6px; /* Reduced from 10px */
+  }
+}
+
+

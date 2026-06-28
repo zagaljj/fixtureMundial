@@ -1036,50 +1036,6 @@ function renderFaseFinal() {
   const container = document.getElementById('fase-final-view');
   if (!container) return;
   
-  // Best Thirds Table
-  let thirdsHtml = `
-    <div class="best-thirds-section">
-      <h3>Tabla de Mejores Terceros</h3>
-      <table class="thirds-table">
-        <thead>
-          <tr>
-            <th>Pos</th>
-            <th>Grupo</th>
-            <th>Equipo</th>
-            <th>PJ</th>
-            <th>GF</th>
-            <th>GC</th>
-            <th>DG</th>
-            <th>Pts</th>
-            <th>Estado</th>
-          </tr>
-        </thead>
-        <tbody>
-  `;
-  
-  state.bestThirds.forEach(t => {
-    const flag = teamFlags[t.name.toUpperCase()] || '🏳️';
-    thirdsHtml += `
-      <tr class="${t.qualified ? 'third-ok' : 'third-eliminated'}">
-        <td>${t.rank}</td>
-        <td>Grupo ${t.group}</td>
-        <td class="team-th">${flag} ${t.name}</td>
-        <td>${t.pj}</td>
-        <td>${t.gf}</td>
-        <td>${t.gc}</td>
-        <td>${t.dg >= 0 ? '+' + t.dg : t.dg}</td>
-        <td class="pts-col">${t.pts}</td>
-        <td><span class="badge">${t.qualified ? 'Clasificado' : 'Eliminado'}</span></td>
-      </tr>
-    `;
-  });
-  
-  thirdsHtml += `
-        </tbody>
-      </table>
-    </div>
-  `;
-  
   // Symmetrical Bracket Render
   const columns = [
     { title: 'Ronda de 32', matches: [73, 75, 74, 77, 76, 78, 79, 80], extraClass: '' },
@@ -1207,8 +1163,6 @@ function renderFaseFinal() {
       <h1>Fase <strong>Final</strong></h1>
       <p>Copa Mundial FIFA 2026™ · Los clasificados se auto-completan desde la Fase de Grupos · Haz clic en un partido para ingresar resultado</p>
     </div>
-    
-    ${thirdsHtml}
     
     <div class="bracket-outer">
       <div class="bracket-wrap" id="bracket">
