@@ -9,7 +9,7 @@ import { teamRatings } from './data/ratings.js';
 export const state = {
   matches: {}, // matchId -> { homeScore: null, awayScore: null, winnerOverride: null }
   timezone: 'auto', // 'auto' or explicit timezone string
-  activeTab: 'portada', // 'portada', 'grupos', 'fase-final', 'selecciones'
+  activeTab: 'fase-final', // 'portada', 'grupos', 'fase-final', 'selecciones'
   groupStandings: {}, // groupLetter -> array of team standings
   bestThirds: [], // array of ranked third place teams
   resolvedKnockoutMatches: {}, // matchId -> { team1, team2, winner, isTied }
@@ -304,30 +304,11 @@ export function recalculateTournament() {
   state.resolvedKnockoutMatches = {};
   
   const resolveRoundOf32 = () => {
-    const r32Defs = {
-      73: { t1: () => getTeam('A', 2), t2: () => getTeam('B', 2) },
-      74: { t1: () => getTeam('C', 1), t2: () => getTeam('F', 2) },
-      75: { t1: () => getTeam('E', 1), t2: () => thirdsMatchups ? getThirdTeamOfGroup(thirdsMatchups['1E']) : '3º Grupo E/F/G/H' },
-      76: { t1: () => getTeam('F', 1), t2: () => getTeam('C', 2) },
-      77: { t1: () => getTeam('E', 2), t2: () => getTeam('I', 2) },
-      78: { t1: () => getTeam('I', 1), t2: () => thirdsMatchups ? getThirdTeamOfGroup(thirdsMatchups['1I']) : '3º Grupo G/H/I/J' },
-      79: { t1: () => getTeam('A', 1), t2: () => thirdsMatchups ? getThirdTeamOfGroup(thirdsMatchups['1A']) : '3º Grupo A/B/C/D' },
-      80: { t1: () => getTeam('L', 1), t2: () => thirdsMatchups ? getThirdTeamOfGroup(thirdsMatchups['1L']) : '3º Grupo K/L' },
-      81: { t1: () => getTeam('G', 1), t2: () => thirdsMatchups ? getThirdTeamOfGroup(thirdsMatchups['1G']) : '3º Grupo H/I/J/K' },
-      82: { t1: () => getTeam('D', 1), t2: () => thirdsMatchups ? getThirdTeamOfGroup(thirdsMatchups['1D']) : '3º Grupo D/E/F/G' },
-      83: { t1: () => getTeam('H', 1), t2: () => getTeam('J', 2) },
-      84: { t1: () => getTeam('K', 2), t2: () => getTeam('L', 2) },
-      85: { t1: () => getTeam('B', 1), t2: () => thirdsMatchups ? getThirdTeamOfGroup(thirdsMatchups['1B']) : '3º Grupo B/C/D/E' },
-      86: { t1: () => getTeam('D', 2), t2: () => getTeam('G', 2) },
-      87: { t1: () => getTeam('J', 1), t2: () => getTeam('H', 2) },
-      88: { t1: () => getTeam('K', 1), t2: () => thirdsMatchups ? getThirdTeamOfGroup(thirdsMatchups['1K']) : '3º Grupo J/K/L' },
-    };
-    
-    Object.keys(r32Defs).forEach(mId => {
-      const matchId = parseInt(mId);
-      const def = r32Defs[matchId];
-      const t1 = def.t1();
-      const t2 = def.t2();
+    for (let matchId = 73; matchId <= 88; matchId++) {
+      const raw = rawMatches.find(m => m.id === matchId);
+      const t1 = raw ? raw.team1 : null;
+      const t2 = raw ? raw.team2 : null;
+      
       const real = state.realScores[matchId] || { played: false, homeScore: null, awayScore: null, winnerOverride: null };
       const pred = state.matches[matchId] || null;
       
@@ -364,8 +345,9 @@ export function recalculateTournament() {
         winner,
         isTied
       };
-    });
+    }
   };
+
   
   resolveRoundOf32();
   
