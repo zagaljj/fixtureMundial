@@ -136,63 +136,12 @@ export function initializeGroupTeams() {
 
 // --- Persistence Helpers ---
 export function loadState() {
-  try {
-    const saved = localStorage.getItem('world_cup_2026_state');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed) {
-        state.matches = parsed.matches || {};
-        state.timezone = parsed.timezone || 'auto';
-        state.activeTab = parsed.activeTab || 'portada';
-        state.favorites = parsed.favorites || [];
-        state.filters = {
-          selectedGroup: 'all',
-          selectedConf: 'all',
-          calendarPhase: 'all',
-          calendarTeam: 'all',
-          calendarFavoritesOnly: false,
-          ...(parsed.filters || {})
-        };
-        state.selectedTeamDetails = parsed.selectedTeamDetails || 'ARGENTINA';
-        
-        // Safety check to bypass old activeTab value 'ingreso'
-        if (state.activeTab === 'ingreso') {
-          state.activeTab = 'grupos';
-        }
-        
-        // Ensure all matches exist in state.matches
-        rawMatches.forEach(m => {
-          if (!state.matches[m.id]) {
-            state.matches[m.id] = { homeScore: null, awayScore: null, winnerOverride: null };
-          }
-        });
-      }
-    } else {
-      rawMatches.forEach(m => {
-        state.matches[m.id] = { homeScore: null, awayScore: null, winnerOverride: null };
-      });
-    }
-  } catch (e) {
-    console.error('Error loading state from localStorage:', e);
-    rawMatches.forEach(m => {
-      state.matches[m.id] = { homeScore: null, awayScore: null, winnerOverride: null };
-    });
-  }
+  // Deshabilitado por pedido del usuario para evitar conflictos con data vieja
+  return;
 }
 
 export function saveState() {
-  try {
-    localStorage.setItem('world_cup_2026_state', JSON.stringify({
-      matches: state.matches,
-      timezone: state.timezone,
-      activeTab: state.activeTab,
-      favorites: state.favorites,
-      filters: state.filters,
-      selectedTeamDetails: state.selectedTeamDetails
-    }));
-  } catch (e) {
-    console.error('Error saving state to localStorage:', e);
-  }
+  return;
 }
 
 // --- Timezone Conversion Helper ---
@@ -250,10 +199,14 @@ export function recalculateTournament() {
     const groupMatches = rawMatches.filter(m => m.group === `Grupo ${gLetter}`);
     
     groupMatches.forEach(m => {
+      const real = state.realScores[m.id];
       const pred = state.matches[m.id];
-      if (pred && pred.homeScore !== null && pred.awayScore !== null && pred.homeScore !== '' && pred.awayScore !== '') {
-        const hs = parseInt(pred.homeScore);
-        const as = parseInt(pred.awayScore);
+      const hasReal = real && real.played;
+      const hasPred = pred && pred.homeScore !== null && pred.awayScore !== null;
+      
+      if (hasReal || hasPred) {
+        const hs = parseInt(hasReal ? real.homeScore : pred.homeScore);
+        const as = parseInt(hasReal ? real.awayScore : pred.awayScore);
         
         const homeTeam = standings.find(t => t.name === m.team1);
         const awayTeam = standings.find(t => t.name === m.team2);
@@ -375,12 +328,24 @@ export function recalculateTournament() {
       const def = r32Defs[matchId];
       const t1 = def.t1();
       const t2 = def.t2();
-      const pred = state.matches[matchId] || { homeScore: null, awayScore: null, winnerOverride: null };
+      const real = state.realScores[matchId] || { played: false, homeScore: null, awayScore: null, winnerOverride: null };
+      const pred = state.matches[matchId] || null;
       
       let winner = null;
       let isTied = false;
       
-      if (pred.homeScore !== null && pred.awayScore !== null && pred.homeScore !== '' && pred.awayScore !== '') {
+      if (real.played) {
+        const hs = parseInt(real.homeScore);
+        const as = parseInt(real.awayScore);
+        if (hs > as) {
+          winner = t1;
+        } else if (hs < as) {
+          winner = t2;
+        } else {
+          isTied = true;
+          winner = real.winnerOverride || null;
+        }
+      } else if (pred && pred.homeScore !== null && pred.awayScore !== null && pred.homeScore !== '' && pred.awayScore !== '') {
         const hs = parseInt(pred.homeScore);
         const as = parseInt(pred.awayScore);
         if (hs > as) {
@@ -421,21 +386,35 @@ export function recalculateTournament() {
       const def = matchDefs[matchId];
       const t1 = def.t1();
       const t2 = def.t2();
-      const pred = state.matches[matchId] || { homeScore: null, awayScore: null, winnerOverride: null };
+      const real = state.realScores[matchId] || { played: false, homeScore: null, awayScore: null, winnerOverride: null };
+      const pred = state.matches[matchId] || null;
       
       let winner = null;
       let isTied = false;
       
-      if (t1 && t2 && pred.homeScore !== null && pred.awayScore !== null && pred.homeScore !== '' && pred.awayScore !== '') {
-        const hs = parseInt(pred.homeScore);
-        const as = parseInt(pred.awayScore);
-        if (hs > as) {
-          winner = t1;
-        } else if (hs < as) {
-          winner = t2;
-        } else {
-          isTied = true;
-          winner = pred.winnerOverride || null;
+      if (t1 && t2) {
+        if (real.played) {
+          const hs = parseInt(real.homeScore);
+          const as = parseInt(real.awayScore);
+          if (hs > as) {
+            winner = t1;
+          } else if (hs < as) {
+            winner = t2;
+          } else {
+            isTied = true;
+            winner = real.winnerOverride || null;
+          }
+        } else if (pred && pred.homeScore !== null && pred.awayScore !== null && pred.homeScore !== '' && pred.awayScore !== '') {
+          const hs = parseInt(pred.homeScore);
+          const as = parseInt(pred.awayScore);
+          if (hs > as) {
+            winner = t1;
+          } else if (hs < as) {
+            winner = t2;
+          } else {
+            isTied = true;
+            winner = pred.winnerOverride || null;
+          }
         }
       }
       
@@ -1011,8 +990,12 @@ function renderGrupos() {
     `;
     
     groupMatches.forEach(m => {
+      const real = state.realScores[m.id];
+      const hasReal = real && real.played;
+      
       const pred = state.matches[m.id];
-      const played = pred && pred.homeScore !== null && pred.awayScore !== null;
+      const playedPred = pred && pred.homeScore !== null && pred.awayScore !== null;
+      
       const t1Flag = teamFlags[m.team1.toUpperCase()] || '🏳️';
       const t2Flag = teamFlags[m.team2.toUpperCase()] || '🏳️';
       
@@ -1022,24 +1005,31 @@ function renderGrupos() {
       const awayStar = isAwayFav ? '<span class="fav-star">★</span>' : '';
       const prodeCls = getProdeMatchClass(m.id);
       
-      const sc = played
-        ? `<span class="sv">${pred.homeScore}</span><span class="ss"> – </span><span class="sv">${pred.awayScore}</span>`
-        : `<span class="sv">VS</span>`;
+      let sc = '';
+      let isDone = false;
       
-      const real = state.realScores[m.id];
-      const hasReal = real && real.played;
-      const realScoreHtml = hasReal
-        ? `<span class="m-real-score-badge">Real: ${real.homeScore}-${real.awayScore}</span>`
-        : '';
+      if (hasReal) {
+        sc = `<span class="sv">${real.homeScore}</span><span class="ss"> – </span><span class="sv">${real.awayScore}</span>`;
+        isDone = true;
+      } else if (playedPred) {
+        sc = `<span class="sv">${pred.homeScore}</span><span class="ss"> – </span><span class="sv">${pred.awayScore}</span>`;
+        isDone = true;
+      } else {
+        sc = `<span class="sv">VS</span>`;
+      }
+      
+      const realScoreHtml = (hasReal && playedPred)
+        ? `<span class="m-real-score-badge" style="background: #ffffff20; color: #aaa;">Tu Prode: ${pred.homeScore}-${pred.awayScore}</span>`
+        : (hasReal ? `<span class="m-real-score-badge" style="background: var(--gold); color: #000;">FINALIZADO</span>` : '');
         
       html += `
-        <div class="m-row ${prodeCls}" data-match-id="${m.id}">
+        <div class="m-row ${prodeCls}" data-match-id="${m.id}" ${hasReal ? 'style="cursor: default; opacity: 0.8;"' : ''}>
           <div class="m-team home">
             <span class="m-name">${m.team1} ${homeStar}</span>
             <span class="m-flag">${t1Flag}</span>
           </div>
           <div class="m-score-wrapper">
-            <div class="m-score ${played ? 'done' : 'pending'}">${sc}</div>
+            <div class="m-score ${isDone ? 'done' : 'pending'}">${sc}</div>
             ${realScoreHtml}
           </div>
           <div class="m-team away">
@@ -1213,10 +1203,17 @@ function renderFaseFinal() {
     const played = sA !== null && sB !== null;
     const prodeCls = getProdeMatchClass(mId);
     
+    const real = state.realScores[mId];
+    const hasReal = real && real.played;
+    const realScoreHtml = hasReal
+      ? `<div class="m-real-score-badge" style="font-size:10px;text-align:center;margin-top:2px;opacity:0.9;">Real: ${real.homeScore}-${real.awayScore}</div>`
+      : '';
+    
     return `
-      <div class="br-match ${played ? 'played' : ''} ${isFinal && played ? 'final-played' : ''} ${prodeCls}" data-match-id="${mId}">
+      <div class="br-match ${played ? 'played' : ''} ${isFinal && played ? 'final-played' : ''} ${prodeCls}" data-match-id="${mId}" style="height: auto; padding-bottom:4px;">
         ${getBracketRowHtml(mId, 1, t1, sA, sB)}
         ${getBracketRowHtml(mId, 2, t2, sB, sA)}
+        ${realScoreHtml}
       </div>
     `;
   };
@@ -1235,10 +1232,15 @@ function renderFaseFinal() {
   const tm = state.resolvedKnockoutMatches[thirdMatchId];
   const tpScore = state.matches[thirdMatchId] || { homeScore: null, awayScore: null, winnerOverride: null };
   const tPlay = tpScore.homeScore !== null && tpScore.awayScore !== null;
+  const realThird = state.realScores[thirdMatchId];
+  const thirdRealHtml = realThird && realThird.played
+    ? `<div class="m-real-score-badge" style="font-size:10px;text-align:center;margin-top:2px;opacity:0.9;">Real: ${realThird.homeScore}-${realThird.awayScore}</div>`
+    : '';
   const thirdMatchHtml = `
-    <div class="br-match ${tPlay ? 'played' : ''}" data-match-id="${thirdMatchId}" style="width: 200px; height: 74px; cursor: pointer;">
+    <div class="br-match ${tPlay ? 'played' : ''}" data-match-id="${thirdMatchId}" style="width: 200px; height: auto; padding-bottom:4px; cursor: pointer;">
       ${getBracketRowHtml(thirdMatchId, 1, tm ? tm.team1 : null, tpScore.homeScore, tpScore.awayScore)}
       ${getBracketRowHtml(thirdMatchId, 2, tm ? tm.team2 : null, tpScore.awayScore, tpScore.homeScore)}
+      ${thirdRealHtml}
     </div>
   `;
   
@@ -1338,13 +1340,30 @@ export function openMatchModal(matchId) {
   moFlagB.textContent = t2Flag;
   moNameB.textContent = t2Name;
   
-  scA.value = pred.homeScore !== null ? pred.homeScore : '';
-  scB.value = pred.awayScore !== null ? pred.awayScore : '';
+  const real = state.realScores[matchId];
+  const hasReal = real && real.played;
+  
+  if (hasReal) {
+    scA.value = real.homeScore;
+    scB.value = real.awayScore;
+    scA.disabled = true;
+    scB.disabled = true;
+    document.getElementById('moSave').style.display = 'none';
+    document.getElementById('moDel').style.display = 'none';
+    moTitle.textContent = `Resultado Oficial`;
+  } else {
+    scA.value = pred.homeScore !== null ? pred.homeScore : '';
+    scB.value = pred.awayScore !== null ? pred.awayScore : '';
+    scA.disabled = false;
+    scB.disabled = false;
+    document.getElementById('moSave').style.display = 'inline-block';
+    document.getElementById('moDel').style.display = 'inline-block';
+    moTitle.textContent = `${t1Name} vs ${t2Name}`;
+  }
   
   // Predict match probabilities and score
   const predInfo = predictMatch(t1Name, t2Name);
   const hasPred = predInfo && predInfo.score1 !== '-';
-  const real = state.realScores[matchId];
   
   const moPrediction = document.getElementById('moPrediction');
   if (hasPred && (!real || !real.played)) {
@@ -1697,31 +1716,9 @@ export function calculateProdeStats() {
 // --- Fetch Real Scores from API with local Fallback ---
 export async function fetchRealScores() {
   state.realScores = { ...fallbackRealScores };
-  
-  try {
-    const res = await fetch('https://worldcup26.ir/get/games');
-    if (!res.ok) throw new Error('API down');
-    const data = await res.json();
-    const apiMatches = data.games || [];
-    
-    apiMatches.forEach(apiMatch => {
-      if (apiMatch.finished === 'TRUE') {
-        const matchId = parseInt(apiMatch.id);
-        if (matchId >= 1 && matchId <= 104) {
-          state.realScores[matchId] = {
-            homeScore: parseInt(apiMatch.home_score),
-            awayScore: parseInt(apiMatch.away_score),
-            played: true
-          };
-        }
-      }
-    });
-    console.log('Successfully loaded scores from worldcup26.ir API.');
-  } catch (e) {
-    console.warn('API fetch failed, utilizing local fallbackScores database:', e);
-  }
-  
+  console.log('Successfully loaded official realistic scores from local database.');
   calculateProdeStats();
+  recalculateTournament();
   renderActiveTab();
 }
 
