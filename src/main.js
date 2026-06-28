@@ -487,9 +487,18 @@ function renderPortada() {
   const container = document.getElementById('portada-view');
   if (!container) return;
   
+  // Calculate Group Stage stats from hardcoded standings
+  let groupGoals = 0;
+  Object.values(state.groupStandings).forEach(group => {
+    group.forEach(t => {
+      groupGoals += t.gf;
+    });
+  });
+  groupGoals = groupGoals / 2; // Each goal is counted once per team, so divide by 2
+  
   // Count stats
-  let totalGoals = 0;
-  let matchesPlayed = 0;
+  let totalGoals = groupGoals;
+  let matchesPlayed = 72; // Group stage has 72 matches
   
   Object.keys(state.matches).forEach(mId => {
     const m = state.matches[mId];
@@ -532,7 +541,7 @@ function renderPortada() {
   container.innerHTML = `
     <div class="welcome-card">
       <h1>Copa Mundial de la FIFA 2026™</h1>
-      <p class="subtitle">Simulador de Fixture Interactivo</p>
+      <p class="subtitle" style="color: var(--gold); font-weight: bold; letter-spacing: 1px;">FASE DE GRUPOS FINALIZADA - INICIA LA FASE FINAL</p>
       <div class="divider"></div>
       
       <div class="stats-grid">
@@ -554,8 +563,8 @@ function renderPortada() {
       
       <div class="info-section">
         <h3>Información del Torneo</h3>
-        <p>El Mundial de 2026 se jugará con <strong>48 selecciones</strong> divididas en <strong>12 grupos de 4</strong> en Canadá, Estados Unidos y México.</p>
-        <p>Los <strong>2 mejores de cada grupo</strong> y los <strong>8 mejores terceros</strong> avanzarán a la nueva ronda de <strong>Dieciseisavos de Final</strong>.</p>
+        <p>La <strong>Fase de Grupos ha finalizado</strong> luego de 72 emocionantes partidos. Las 32 mejores selecciones ya están confirmadas para los Dieciseisavos de Final.</p>
+        <p>¡El verdadero torneo comienza ahora! Navegá a la <strong>Fase Final</strong> para empezar a predecir los cruces de eliminación directa hacia la gran final del 19 de julio.</p>
       </div>
     </div>
   `;
