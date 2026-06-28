@@ -1036,17 +1036,13 @@ function renderFaseFinal() {
   const container = document.getElementById('fase-final-view');
   if (!container) return;
   
-  // Symmetrical Bracket Render
+  // 5-Column One-Sided Bracket Render
   const columns = [
-    { title: 'Ronda de 32', matches: [73, 75, 74, 77, 76, 78, 79, 80], extraClass: '' },
-    { title: 'Octavos', matches: [89, 90, 91, 92], extraClass: '' },
-    { title: 'Cuartos', matches: [97, 99], extraClass: '' },
-    { title: 'Semis', matches: [101], extraClass: '' },
-    { title: '★ Final', matches: [104], extraClass: ' fc' },
-    { title: 'Semis', matches: [102], extraClass: '' },
-    { title: 'Cuartos', matches: [98, 100], extraClass: '' },
-    { title: 'Octavos', matches: [93, 94, 95, 96], extraClass: '' },
-    { title: 'Ronda de 32', matches: [83, 84, 81, 82, 86, 88, 85, 87], extraClass: '' }
+    { title: 'Ronda de 32', matches: [73, 75, 74, 77, 76, 78, 79, 80, 83, 84, 81, 82, 86, 88, 85, 87], extraClass: '' },
+    { title: 'Octavos', matches: [89, 90, 91, 92, 93, 94, 95, 96], extraClass: '' },
+    { title: 'Cuartos', matches: [97, 99, 98, 100], extraClass: '' },
+    { title: 'Semis', matches: [101, 102], extraClass: '' },
+    { title: '★ Final', matches: [104], extraClass: ' fc' }
   ];
   
   const getBracketRowHtml = (mId, side, team, score, oppositeScore) => {

@@ -2206,27 +2206,51 @@ body {
 
 /* --- Bracket Mobile Responsiveness --- */
 @media (max-width: 768px) {
+  .bracket-outer {
+    padding-bottom: 20px;
+  }
+  
   .bracket-wrap {
-    gap: 4px;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
     padding: 0 10px;
+    width: 100%;
+    min-width: unset;
   }
   
   .br-col {
-    width: 140px; /* Reduced from 194px */
+    width: 100%;
+    align-items: center;
   }
   
   .br-col.fc {
-    width: 150px;
+    width: 100%;
+  }
+  
+  .br-matches {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    margin-top: 8px;
   }
   
   .br-match {
-    width: 136px !important; /* Reduced from 184px */
-    height: 58px !important; /* Reduced from 68px */
+    width: calc(50% - 6px) !important;
+    height: 58px !important;
     border-radius: 6px;
+    flex-shrink: 1;
+  }
+  
+  .br-match::before, .br-match::after {
+    display: none !important;
   }
   
   .fc .br-match {
-    width: 146px !important; /* Reduced from 200px */
+    width: 100% !important;
+    max-width: 250px;
     height: 64px !important;
   }
   
@@ -2235,23 +2259,27 @@ body {
   }
   
   .br-team {
-    font-size: 11px; /* Reduced from 12px */
+    font-size: 11px;
   }
   
   .br-flag {
-    font-size: 14px; /* Reduced from 16px */
+    font-size: 14px;
   }
   
   .br-score {
-    width: 20px; /* Reduced from 24px */
+    width: 20px;
     height: 20px;
     font-size: 12px;
   }
   
   .br-col-hd {
-    font-size: 9px; /* Reduced from 10px */
-    padding: 2px 6px;
-    margin-bottom: 6px; /* Reduced from 10px */
+    font-size: 11px;
+    padding: 4px 12px;
+    margin-bottom: 0;
+    width: 100%;
+    max-width: 250px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.05);
   }
 }
 
