@@ -907,12 +907,12 @@ body {
 }
 
 .br-matches {
-  height: 720px;
   display: flex;
   flex-direction: column;
   justify-content: space-around;
   align-items: center;
   width: 100%;
+  gap: 12px;
 }
 
 .br-match {
@@ -2229,8 +2229,8 @@ body {
   
   .br-matches {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
     gap: 12px;
     width: 100%;
     margin-top: 8px;
