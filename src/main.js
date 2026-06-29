@@ -1069,7 +1069,7 @@ function renderFaseFinal() {
     const flag = teamFlags[team.toUpperCase()] || '🏳️';
     const isFav = state.favorites.includes(team.toUpperCase());
     const favStar = isFav ? '<span class="fav-star">★</span>' : '';
-    return `<div class="br-row${cls}"><span class="br-flag">${flag}</span><span class="br-name" onclick="event.stopPropagation(); window.openSquadModal('${team.toUpperCase()}')" style="cursor: pointer;" title="Ver plantel">${team} ${favStar}</span>${sc}</div>`;
+    return `<div class="br-row${cls}"><span class="br-flag">${flag}</span><span class="br-name" title="Ingresar resultado">${team} ${favStar}</span>${sc}</div>`;
   };
   
   const getSeedLabel = (matchId, side) => {
