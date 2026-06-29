@@ -1934,50 +1934,49 @@ body {
 /* Modal de resultados responsivo */
 @media (max-width: 480px) {
   #moOverlay .modal {
-    padding: 20px;
+    padding: 24px 16px;
+    width: 95%;
   }
   
   .mo-teams {
-    grid-template-columns: 1fr;
-    gap: 12px;
-    margin-bottom: 16px;
+    /* Keep side-by-side */
+    grid-template-columns: 1fr auto 1fr;
+    gap: 8px;
+    margin-bottom: 24px;
   }
   
   .mo-team {
-    flex-direction: row;
-    gap: 12px;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 14px;
-    justify-content: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    background: transparent;
+    border: none;
+    padding: 0;
+    justify-content: center;
     width: 100%;
   }
   
   .mo-team .mo-tflag {
-    font-size: 24px;
+    font-size: 32px;
   }
   
   .mo-team .mo-tname {
-    font-size: 13px;
-    text-align: left;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 11px;
+    text-align: center;
+    white-space: normal;
   }
   
   .mo-inputs {
     justify-content: center;
-    gap: 12px;
-    background: rgba(255, 255, 255, 0.01);
-    padding: 8px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
+    gap: 8px;
+    background: transparent;
+    padding: 0;
+    border: none;
   }
   
   .sc-inp {
-    width: 68px;
-    height: 52px;
+    width: 64px;
+    height: 64px;
+    font-size: 32px;
   }
   
   /* Ajustar botones de acción en pantallas ultra angostas */
@@ -2238,10 +2237,12 @@ body {
   }
   
   .br-match {
-    width: calc(50% - 6px) !important;
-    height: 58px !important;
-    border-radius: 6px;
+    width: 100% !important;
+    max-width: 320px;
+    height: 64px !important;
+    border-radius: 8px;
     flex-shrink: 1;
+    margin: 0 auto;
   }
   
   .br-match::before, .br-match::after {
